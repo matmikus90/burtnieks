@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="lv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Burtnieks</title>
+  <style>
+    :root{ --gap:3px; --cell: clamp(30px, calc((min(100vw, 1700px) - 480px)/15), 72px); }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#1a1a1a; color:#eee; overflow-x:hidden; }
+    .container{ max-width:min(1700px,98vw); margin:10px auto; padding:0 14px 18px; }
+    .topbar{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; font-weight:900; letter-spacing:.8px; gap:10px; flex-wrap:wrap; }
+    .turn{ text-align:center; flex:1; color:#31d17a; min-width:240px; }
+    .brand{ width:260px; font-size:22px; display:flex; gap:10px; align-items:center; }
+    .dot{ width:10px; height:10px; border-radius:999px; background:#ffd39a; box-shadow:0 0 18px rgba(255,211,154,.35); }
+    .right{ width:260px; text-align:right; color:#aaa; font-weight:700; }
+    .subtop{ display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; color:#bbb; font-size:13px; flex-wrap:wrap; }
+    .hidden{ display:none !important; }
+
+    .card{ border-radius:16px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); padding:12px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    input,button{ padding:10px 12px; font-size:15px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25); color:#eee; outline:none; }
+    button{ cursor:pointer; background:rgba(255,255,255,.12); position:relative; z-index:10; touch-action:manipulation; pointer-events:auto; }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+    .danger{ border-color:rgba(255,90,90,.35); background:rgba(255,90,90,.12); }
+    #commit{ background:linear-gradient(180deg, rgba(49,209,122,.55), rgba(49,209,122,.18)); border-color:rgba(49,209,122,.45); }
+    #commit:hover{ filter:brightness(1.08); }
+    .pillBtn{ padding:8px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20); font-weight:900; display:inline-flex; gap:10px; align-items:center; }
+    .small{ font-size:13px; color:#bbb; }
+    #toast{ min-height:18px; }
+
+    .wrap{ display:grid; grid-template-columns:max-content minmax(360px,480px); gap:14px; margin-top:12px; justify-content:center; align-items:start; }
+    @media (max-width:1100px){ .wrap{ grid-template-columns:1fr; } }
+
+    .boardWrap{ padding:12px; border-radius:14px; background:#0b2a17; border:1px solid rgba(255,255,255,.10); position:relative; overflow:auto; box-shadow:0 30px 90px rgba(0,0,0,.55); }
+    .board{ display:grid; grid-template-columns:repeat(15,var(--cell)); grid-auto-rows:var(--cell); gap:var(--gap); user-select:none; justify-content:center; touch-action:none; }
+    .cell{ border-radius:4px; background:#2d6b3c; border:2px solid rgba(255,255,255,.55); display:flex; align-items:center; justify-content:center; position:relative; }
+    .cell[data-m="TW"]{ background:#d81818; color:#fff; }
+    .cell[data-m="DW"]{ background:#f0b45a; color:#1b1b1b; }
+    .cell[data-m="TL"]{ background:#1246d8; color:#fff; }
+    .cell[data-m="DL"]{ background:#7fc0ff; color:#1b1b1b; }
+    .cell[data-m="★"] { background:#f2c24f; color:#1b1b1b; }
+    .m{ font-weight:950; font-size:10px; line-height:1.05; letter-spacing:.2px; text-align:center; padding:2px; text-transform:uppercase; opacity:.95; pointer-events:none; }
+    .m span{ display:block; }
+
+    .tile{
+      width:calc(var(--cell) - 10px); height:calc(var(--cell) - 10px);
+      border-radius:10px; background:#f5e7c9; border:1px solid rgba(0,0,0,.30);
+      box-shadow:0 6px 14px rgba(0,0,0,.35);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:950; color:#1b1b1b; position:relative;
+      cursor:grab; touch-action:none;
+      font-size: clamp(16px, calc(var(--cell) * 0.41), 34px);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .tile:active{ cursor:grabbing; }
+    .pts{ position:absolute; bottom:4px; right:6px; font-size:11px; font-weight:950; color:rgba(0,0,0,.65); }
+    .blank{ border-style:dashed; }
+    .ghost{ opacity:.65; filter:saturate(.9) contrast(.95); box-shadow:0 10px 24px rgba(0,0,0,.35); cursor:default; }
+    .dragGhost{ position:fixed; z-index:200000; pointer-events:none; transform: translate(-50%, -50%); opacity:.95; filter: drop-shadow(0 18px 26px rgba(0,0,0,.45)); }
+    .tile.dim{ opacity:.35; }
+
+    .rack{ display:flex; flex-wrap:wrap; gap:10px; padding:10px; border-radius:14px; border:1px dashed rgba(255,255,255,.18); background:rgba(0,0,0,.25); min-height:56px; touch-action:none; }
+    .rackSlot{ width: calc(var(--cell) - 2px); height: calc(var(--cell) - 2px); border-radius:12px; border:1px dashed rgba(255,255,255,.10); display:flex; align-items:center; justify-content:center; }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .players{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+    .p{ border-radius:14px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.25); padding:10px; }
+    .p.turnBox{
+      border-color: rgba(49,209,122,.55);
+      background: linear-gradient(180deg, rgba(49,209,122,.16), rgba(0,0,0,.22));
+      box-shadow: 0 18px 40px rgba(49,209,122,.12);
+    }
+
+    .disabledHint{ margin-top:8px; padding:10px; border-radius:12px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); color:#bbb; }
+    .readyRow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .badgeReady{ padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25); }
+    .ok{ color:#31d17a; font-weight:900; }
+    .footerBar{ margin-top:10px; text-align:center; color:#9b9b9b; font-size:12px; }
+
+    .notice{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(49,209,122,.28);
+      background:rgba(49,209,122,.10);
+      color:#dff7ea;
+      font-weight:800;
+    }
+
+    .lb{ margin-top:12px; }
+    .lb h3{ margin:0 0 8px; font-size:14px; letter-spacing:.3px; }
+    .lbRow{ display:flex; justify-content:space-between; padding:6px 10px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); margin-bottom:6px; }
+
+    .rooms{ margin-top:12px; }
+    .rooms h3{ margin:0 0 8px; font-size:14px; letter-spacing:.3px; }
+    .roomRow{ display:flex; gap:10px; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); margin-bottom:8px; }
+
+    .last3{ margin-top:12px; }
+    .last3 h3{ margin:0 0 8px; font-size:14px; letter-spacing:.3px; }
+    .wrow{ padding:10px; border-radius:14px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); margin-bottom:10px; }
+    .wtop{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+    .wtop b{ letter-spacing:.5px; }
+    .wbtns{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .miniBtn{ padding:7px 10px; font-size:13px; border-radius:12px; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; color:#cfcfcf; white-space:pre-wrap; }
+
+    .chat{ position:fixed; right:14px; bottom:14px; width:min(340px,92vw); border-radius:16px; background:rgba(10,10,10,.80); border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 30px 90px rgba(0,0,0,.55); z-index:100001; backdrop-filter:blur(10px); overflow:hidden; display:flex; flex-direction:column; }
+    .chatHdr{ padding:10px 12px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,.10); font-weight:950; }
+    .chatTitle{ display:flex; gap:8px; align-items:center; }
+    .titleDot{ display:none; width:10px; height:10px; border-radius:999px; background:#31d17a; box-shadow:0 0 12px rgba(49,209,122,.6); }
+    .chatBody{ padding:10px 12px; max-height:240px; overflow:auto; display:flex; flex-direction:column; gap:8px; font-size:13px; }
+    .msg{ display:flex; gap:8px; align-items:baseline; }
+    .msg b{ color:#fff; }
+    .msg span{ color:#bbb; }
+    .chatInp{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid rgba(255,255,255,.10); }
+    .chatInp input{ flex:1; }
+    .chatMinBtn{ width:40px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:999px; padding:0; position:relative; }
+    .chatIcon{ font-weight:900; font-size:16px; line-height:1; transform: translateY(-1px); }
+    .chatBadge{ display:none; width:10px;height:10px;border-radius:999px; background:#31d17a; box-shadow:0 0 12px rgba(49,209,122,.6); position:absolute; top:5px; right:6px; }
+    .chat.min .chatBody, .chat.min .chatInp{ display:none; }
+    .chat.min{ width:min(260px, 92vw); }
+
+    .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.60); display:none; align-items:center; justify-content:center; z-index:99999; }
+    .panel{ width:min(860px,92vw); border-radius:18px; background:rgba(15,15,15,.92); border:1px solid rgba(255,255,255,.12); padding:14px; box-shadow:0 30px 90px rgba(0,0,0,.65); }
+    .title{ font-weight:950; letter-spacing:.5px; }
+    .grid{ display:grid; grid-template-columns:1fr 90px; gap:10px; margin-top:10px; }
+    .box{ width:72px; height:72px; border-radius:16px; background:linear-gradient(180deg,#fff,#d9d9d9); color:#111; display:flex; align-items:center; justify-content:center;
+      font-weight:950; font-size:34px; border:1px solid rgba(0,0,0,.25); box-shadow:0 16px 30px rgba(0,0,0,.35); }
+    .orderLine{ margin-top:10px; color:#ddd; }
+    .hl{ color:#31d17a; font-weight:900; }
+
+    @media (max-width: 640px){
+      :root{ --gap:2px; --cell: clamp(24px, calc((100vw - 32px)/15), 40px); }
+      .wrap{ grid-template-columns:1fr; }
+      .actions button{ flex:1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand"><span class="dot"></span>Burtnieks</div>
+      <div class="turn hidden" id="turnTxt">GĀJIENS: —</div>
+      <div class="right hidden" id="bagBox">Maisā: <span id="bag">—</span></div>
+    </div>
+
+    <div class="subtop">
+      <div id="lobbyLine">Lobijs: —</div>
+      <div id="timerLine" class="hidden">Gājiena laiks: —</div>
+      <div id="gameTimeLine" class="hidden">Spēles laiks: —</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="name" placeholder="Tavs vārds (unikāls)" />
+        <button id="createRoom" type="button">Izveidot istabu</button>
+
+        <input id="room" placeholder="Istaba (ja pievienojies)" />
+        <button id="join" type="button">Pievienoties istabai</button>
+
+        <button id="audioBtn" class="pillBtn" type="button">Audio: <span id="audioState">🔇</span></button>
+        <span class="small" id="toast"></span>
+      </div>
+
+      <div class="lb" id="lbStart">
+        <h3>TOP uzvaras (10)</h3>
+        <div id="lbStartList"><div class="small">Ielādē…</div></div>
+      </div>
+
+      <div class="rooms" id="roomsBox">
+        <h3>Aktīvās istabas</h3>
+        <div id="roomsList"><div class="small">Ielādē…</div></div>
+      </div>
+
+      <div id="lobbyControls" style="margin-top:10px; display:none;">
+        <div class="notice" id="readyNotice">
+          Lai sāktu spēli, <b>visiem</b> jānospiež <b>Gatavs ✅</b>.
+        </div>
+
+        <div class="row" id="timeRow" style="margin-top:10px;">
+          <input id="turnTime" type="number" min="0" max="3600" step="1" value="0" style="width:260px;" />
+          <button id="setTime" type="button">Uzlikt laiku</button>
+          <button id="readyBtn" type="button">Gatavs ✅</button>
+          <button id="addBot" type="button">Pievienot datoru 🤖</button>
+        </div>
+
+        <div class="small" style="margin-top:8px;">
+          Noklusējums: 0 (bezgalīgi).
+          <span id="capInfo"></span>
+        </div>
+        <div style="margin-top:10px;" class="readyRow" id="readyList"></div>
+      </div>
+    </div>
+
+    <div id="game" class="wrap" style="display:none;">
+      <div class="boardWrap" id="boardWrap">
+        <div id="board" class="board"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <div><b id="rackTitle">Tavi kauliņi</b></div>
+          <div class="small" id="rackTimer">—</div>
+        </div>
+
+        <div class="small" id="turnHint" style="margin-top:6px;"></div>
+
+        <div id="rack" class="rack" style="margin-top:10px;"></div>
+
+        <div class="actions" id="actions">
+          <button id="clear" type="button">Notīrīt gājienu</button>
+          <button id="commit" type="button">Apstiprināt gājienu</button>
+          <button id="pass" type="button">Izlaist gājienu</button>
+          <button id="exchange" type="button">Nomainīt kauliņus</button>
+          <button id="leave" type="button" class="danger">Iziet no spēles</button>
+        </div>
+
+        <div class="last3" id="last3Box" style="display:none;">
+          <h3>Pēdējie vārdi (3)</h3>
+          <div id="last3List"><div class="small">—</div></div>
+        </div>
+
+        <div style="margin-top:14px;"><b>Spēlētāji</b></div>
+        <div id="players" class="players"></div>
+
+        <div class="disabledHint" id="waitBox" style="display:none;">Tagad nav tavs gājiens — vari pārkārtot savus kauliņus, bet nevari likt uz laukuma.</div>
+        <div class="disabledHint" id="spectatorBox" style="display:none;">Skatītāja režīms — vari tikai vērot spēli.</div>
+
+        <div class="footerBar">Tiešsaistē: <b><span id="onlineCount">—</span></b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat min" id="chat" style="display:none;">
+    <div class="chatHdr">
+      <div class="chatTitle">
+        <span id="chatTitleText">Čats</span>
+        <span class="titleDot" id="chatTitleDot"></span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span class="small" id="chatStatus">—</span>
+        <button class="chatMinBtn" id="chatMinBtn" type="button" aria-label="Atvērt/aizvērt čatu">
+          <span class="chatIcon" id="chatIcon">▢</span>
+          <span class="chatBadge" id="chatBadge"></span>
+        </button>
+      </div>
+    </div>
+    <div class="chatBody" id="chatBody"></div>
+    <div class="chatInp">
+      <input id="chatMsg" placeholder="Raksti ziņu…" />
+      <button id="chatSend" type="button">Sūtīt</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="panel">
+      <div class="title">Izloze ar burtiem (alfabēts) — gājienu secība</div>
+      <div class="small">Rezultāts redzams 5s.</div>
+      <div id="startList" style="margin-top:10px;"></div>
+      <div class="orderLine" id="orderLine"></div>
+      <div class="small" style="margin-top:10px;">Spēle sākta ✅</div>
+    </div>
+  </div>
+
+  <div class="overlay" id="inflOverlay">
+    <div class="panel">
+      <div class="title" id="inflTitle">Locījumi</div>
+      <div class="small" id="inflSub">—</div>
+      <div class="mono" id="inflBody" style="margin-top:10px; max-height:55vh; overflow:auto;"></div>
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+        <button id="inflClose" type="button" class="danger">Aizvērt</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    (function(){
+      const $ = (id)=>document.getElementById(id);
+      function toast(msg){
+        const el = $("toast");
+        if(!el) return;
+        el.textContent = String(msg||"");
+        if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=""; }, 2600);
+      }
+      window.__toast = toast;
+
+      let socket=null;
+      try{ socket = io(); }catch{ toast("Kļūda: nav Socket.IO."); }
+      window.__socket=socket;
+
+      function renderLB(listEl, lb){
+        listEl.innerHTML = "";
+        if(!lb || !lb.length){ listEl.innerHTML = "<div class='small'>—</div>"; return; }
+        lb.slice(0,10).forEach((p,i)=>{
+          const r=document.createElement("div");
+          r.className="lbRow";
+          r.innerHTML = `<div><b>${i+1}. ${p.name}</b></div><div>${p.wins} uzv.</div>`;
+          listEl.appendChild(r);
+        });
+      }
+      function renderRooms(listEl, rooms){
+        listEl.innerHTML = "";
+        if(!rooms || !rooms.length){ listEl.innerHTML = "<div class='small'>Nav aktīvu istabu.</div>"; return; }
+        rooms.forEach(r=>{
+          const row=document.createElement("div");
+          row.className="roomRow";
+          const status = r.started ? "Spēle notiek" : "Lobijs";
+          row.innerHTML = `
+            <div>
+              <b>Istaba: ${r.roomId}</b><div class="small">${status} · Spēlētāji: ${r.players} · Skatītāji: ${r.spectators}</div>
+            </div>
+            <button type="button" data-room="${r.roomId}">Pievienoties</button>
+          `;
+          row.querySelector("button").onclick = ()=>{ $("room").value = r.roomId; $("join").click(); };
+          listEl.appendChild(row);
+        });
+      }
+
+      if(socket){
+        socket.on("connect", ()=> toast("Savienots ✅"));
+        socket.on("connect_error", ()=> toast("Nav savienojuma ar serveri (socket.io)"));
+        socket.on("toast", (m)=> toast(m));
+        socket.on("online", (n)=>{ $("onlineCount").textContent=String(n??"—"); });
+        socket.on("public",(p)=>{ renderLB($("lbStartList"), p.leaderboardTop||[]); });
+        socket.on("roomsList",(p)=>{ renderRooms($("roomsList"), p.rooms||[]); });
+      }
+
+      function getName(){ return (($("name")?.value||"").trim()||""); }
+      function join(roomId){
+        const name = getName();
+        if(!name) return toast("Ievadi savu vārdu.");
+        if(!roomId) return toast("Ievadi istabu vai izveido jaunu.");
+        socket.emit("join",{roomId:String(roomId).trim().toLowerCase(), name});
+      }
+
+      $("createRoom").addEventListener("click", ()=>{
+        const code = String(Math.floor(1000 + Math.random()*9000));
+        $("room").value = code;
+        join(code);
+      });
+      $("join").addEventListener("click", ()=> join(($("room")?.value||"")) );
+    })();
+  </script>
+
+  <script>
+    (function(){
+      const $ = (id)=>document.getElementById(id);
+      const socket = window.__socket;
+      const toast = window.__toast || ((m)=>console.log(m));
+      const key = (x,y)=>`${x},${y}`;
+
+      let state=null, joined=false;
+
+      let chatMin = true;
+      let chatInit = false;
+      let prevChatLen = 0;
+      function setChatIcon(){ $("chatIcon").textContent = chatMin ? "▢" : "▁"; }
+      function setUnread(on){ $("chatBadge").style.display = on ? "" : "none"; $("chatTitleDot").style.display = on ? "" : "none"; }
+      setChatIcon(); setUnread(false);
+      $("chatMinBtn").onclick = ()=>{ chatMin = !chatMin; $("chat").classList.toggle("min", chatMin); if(!chatMin) setUnread(false); setChatIcon(); };
+
+      let AC=null, audioReady=false, master=null;
+      let audioMuted=true;
+      function ensureAudio(){
+        if (audioReady) return true;
+        try{
+          AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+          if (AC.state==="suspended") AC.resume();
+          master = AC.createGain();
+          master.gain.value = audioMuted ? 0.0 : 0.20;
+          master.connect(AC.destination);
+          audioReady=true;
+          return true;
+        }catch{ return false; }
+      }
+      function setAudioMuted(m){ audioMuted=!!m; if(master) master.gain.value = audioMuted?0.0:0.20; $("audioState").textContent = audioMuted ? "🔇" : "🔊"; }
+      setAudioMuted(true);
+      $("audioBtn").onclick = ()=>{ ensureAudio(); setAudioMuted(!audioMuted); };
+
+      function playTone(seq){
+        ensureAudio();
+        if(!audioReady || audioMuted) return;
+        const t0=AC.currentTime+0.01;
+        let t=t0;
+        for(const s of seq){
+          const o=AC.createOscillator(), g=AC.createGain();
+          o.type=s.type||"triangle";
+          o.frequency.setValueAtTime(s.f, t);
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(s.a||0.10, t+0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t+(s.d||0.14));
+          o.connect(g); g.connect(master);
+          o.start(t); o.stop(t+(s.d||0.14)+0.03);
+          t += (s.gap||0.06);
+        }
+      }
+      function sChat(){ playTone([{f:880,a:0.09,d:0.10},{f:740,a:0.08,d:0.10,gap:0.04}]); }
+      function sConfirm(){ playTone([{f:660,a:0.10,d:0.12},{f:990,a:0.08,d:0.12,gap:0.03}]); }
+
+      function fmtMS(ms){
+        ms=Math.max(0,ms|0); const s=Math.floor(ms/1000);
+        const mm=String(Math.floor(s/60)).padStart(2,"0");
+        const ss=String(s%60).padStart(2,"0");
+        return `${mm}:${ss}`;
+      }
+      function setTopHudVisible(v){
+        $("turnTxt").classList.toggle("hidden", !v);
+        $("bagBox").classList.toggle("hidden", !v);
+        $("timerLine").classList.toggle("hidden", !v);
+        $("gameTimeLine").classList.toggle("hidden", !v);
+      }
+      setTopHudVisible(false);
+
+      setInterval(()=>{
+        if(!state){ $("timerLine").textContent="Gājiena laiks: —"; $("gameTimeLine").textContent="Spēles laiks: —"; $("rackTimer").textContent="—"; return; }
+        let turnText="Atlikušais laiks: ∞";
+        if(state.started && state.turnEndsAt && state.turnTimeSec && state.turnTimeSec>0){
+          const left=Math.max(0, Math.ceil((state.turnEndsAt-Date.now())/1000));
+          turnText=`Atlikušais laiks: ${left}s`;
+        }
+        $("rackTimer").textContent = state.started ? turnText : "—";
+
+        if(!state.started || !state.turnTimeSec || state.turnTimeSec<=0){
+          $("timerLine").textContent="Gājiena laiks: ∞";
+        }else{
+          const left=Math.max(0, Math.ceil((state.turnEndsAt-Date.now())/1000));
+          $("timerLine").textContent=`Gājiena laiks: ${left}s`;
+        }
+
+        if(state.started && state.gameStartAt) $("gameTimeLine").textContent="Spēles laiks: " + fmtMS(Date.now()-state.gameStartAt);
+        else $("gameTimeLine").textContent="Spēles laiks: —";
+      }, 250);
+
+      $("setTime").onclick = ()=>{ if(!socket||!state||state.started||state.role!=="player") return; socket.emit("setTurnTime",{roomId:state.roomId, sec:Number($("turnTime").value||0)}); };
+      $("readyBtn").onclick = ()=>{ if(!socket||!state||state.role!=="player") return; socket.emit("readyStart",{roomId:state.roomId}); $("readyBtn").disabled=true; };
+
+      $("addBot").onclick = ()=>{ if(!socket||!state||state.role!=="player"||state.started) return; socket.emit("addBot",{roomId:state.roomId}); };
+
+      $("chatSend").onclick = sendChat;
+      $("chatMsg").addEventListener("keydown",(e)=>{ if(e.key==="Enter") sendChat(); });
+      function sendChat(){
+        if(!socket||!state) return;
+        const msg=$("chatMsg").value.trim(); if(!msg) return;
+        socket.emit("chatSend",{roomId:state.roomId, msg});
+        $("chatMsg").value="";
+      }
+
+      $("inflClose").onclick = ()=>{ $("inflOverlay").style.display="none"; };
+      async function openInflections(lemma, word){
+        if(!lemma) return toast("Nav lemma.");
+        $("inflTitle").textContent = `Locījumi: ${String(word||lemma).toUpperCase()}`;
+        $("inflSub").textContent = "Ielādē…";
+        $("inflBody").textContent = "";
+        $("inflOverlay").style.display="flex";
+        try{
+          const r = await fetch(`/api/inflections?lemma=${encodeURIComponent(lemma)}`);
+          const j = await r.json();
+          if(!j.ok){ $("inflSub").textContent = j.err || "Kļūda"; return; }
+          $("inflSub").textContent = `Paradigma: ${j.paradigm}`;
+          $("inflBody").textContent = JSON.stringify(j.data, null, 2);
+        }catch{ $("inflSub").textContent = "Neizdevās ielādēt locījumus."; }
+      }
+
+      let rackOrder = [];
+      const temp = new Map();
+      let selectedBlank = null;
+      const drag = { active:false, tileId:null, from:null, fromX:null, fromY:null, el:null, ghost:null };
+
+      function emitRackOrder(){ if(!socket || !state?.roomId || state.role!=="player") return; socket.emit("reorderRack", { roomId: state.roomId, order: rackOrder.slice() }); }
+      function canPlaceOnBoard(){ return !!(state && state.role==="player" && state.started && state.turnId===state.meId); }
+      function canReorderRack(){ return !!(state && state.role==="player"); }
+
+      function startPointerDrag(e, el){
+        if (drag.active) return;
+        const tileId = el.dataset.tileId;
+        if (!tileId) return;
+
+        drag.active=true;
+        drag.tileId=String(tileId);
+        drag.from=el.dataset.source;
+        drag.el=el;
+        drag.fromX=el.dataset.fromX!=null ? Number(el.dataset.fromX) : null;
+        drag.fromY=el.dataset.fromY!=null ? Number(el.dataset.fromY) : null;
+
+        const g = el.cloneNode(true);
+        g.classList.add("dragGhost");
+        g.style.left = e.clientX + "px";
+        g.style.top  = e.clientY + "px";
+        document.body.appendChild(g);
+        drag.ghost = g;
+
+        el.classList.add("dim");
+        try{ el.setPointerCapture(e.pointerId); }catch{}
+
+        window.addEventListener("pointermove", onPointerMove, {passive:false});
+        window.addEventListener("pointerup", onPointerUp, {passive:false});
+        window.addEventListener("pointercancel", onPointerUp, {passive:false});
+      }
+      function onPointerMove(e){
+        if(!drag.active) return;
+        e.preventDefault();
+        drag.ghost.style.left = e.clientX + "px";
+        drag.ghost.style.top  = e.clientY + "px";
+      }
+      function findDropTarget(clientX, clientY){
+        let el = document.elementFromPoint(clientX, clientY);
+        while(el && el!==document.body){
+          if(el.classList?.contains("cell")) return { type:"cell", el };
+          if(el.id==="rack" || el.classList?.contains("rack")) return { type:"rack", el: $("rack") };
+          if(el.classList?.contains("tile") && el.closest?.("#rack")) return { type:"rackTile", el };
+          el = el.parentElement;
+        }
+        return null;
+      }
+      function endPointerDrag(){
+        drag.active=false; drag.tileId=null; drag.from=null; drag.fromX=null; drag.fromY=null;
+        if(drag.el) drag.el.classList.remove("dim");
+        drag.el=null;
+        if(drag.ghost){ drag.ghost.remove(); drag.ghost=null; }
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("pointercancel", onPointerUp);
+      }
+
+      let draftTimer=null;
+      function scheduleDraft(){
+        if(!socket || !state || !state.started) return;
+        if(state.role!=="player") return;
+        if(state.turnId!==state.meId) return;
+        if(draftTimer) return;
+        draftTimer=setTimeout(()=>{
+          draftTimer=null;
+          const placements=[];
+          for(const [k,v] of temp.entries()){
+            const [x,y]=k.split(",").map(Number);
+            placements.push({x,y,tileId:v.tileId, as:v.as||null});
+          }
+          socket.emit("draftUpdate",{roomId:state.roomId, placements});
+        }, 60);
+      }
+
+      function onPointerUp(e){
+        if(!drag.active) return;
+        e.preventDefault();
+
+        const tgt = findDropTarget(e.clientX, e.clientY);
+
+        if(!tgt){
+          if(drag.from==="temp" && drag.fromX!=null){
+            if(canPlaceOnBoard()){
+              temp.delete(key(drag.fromX, drag.fromY));
+              scheduleDraft();
+            }
+          }
+          endPointerDrag(); renderAll(); return;
+        }
+
+        if(tgt.type==="cell"){
+          if(!canPlaceOnBoard()){
+            endPointerDrag(); renderAll(); return;
+          }
+
+          const cell=tgt.el;
+          const x=Number(cell.dataset.x), y=Number(cell.dataset.y);
+
+          if(state.board?.[y]?.[x] || temp.has(key(x,y))){
+            endPointerDrag(); renderAll(); return;
+          }
+
+          if(drag.from==="temp" && drag.fromX!=null){
+            const prevKey=key(drag.fromX, drag.fromY);
+            const prev=temp.get(prevKey);
+            temp.delete(prevKey);
+            temp.set(key(x,y), { tileId: drag.tileId, as: prev?.as || null });
+          }else{
+            for(const v of temp.values()) if(String(v.tileId)===String(drag.tileId)){ endPointerDrag(); renderAll(); return; }
+            temp.set(key(x,y), { tileId: drag.tileId });
+          }
+
+          scheduleDraft();
+          endPointerDrag(); renderAll(); return;
+        }
+
+        if(tgt.type==="rack" || tgt.type==="rackTile"){
+          if(drag.from==="temp" && drag.fromX!=null){
+            if(canPlaceOnBoard()){
+              temp.delete(key(drag.fromX, drag.fromY));
+              scheduleDraft();
+            }
+            endPointerDrag(); renderAll(); return;
+          }
+
+          if(drag.from==="rack"){
+            if(!canReorderRack()){ endPointerDrag(); renderAll(); return; }
+
+            const id=String(drag.tileId);
+            const curIndex=rackOrder.indexOf(id);
+            if(curIndex===-1){ endPointerDrag(); renderAll(); return; }
+
+            let targetIndex=rackOrder.length-1;
+            if(tgt.type==="rackTile"){
+              const tId=String(tgt.el.dataset.tileId||"");
+              const idx=rackOrder.indexOf(tId);
+              if(idx!==-1) targetIndex=idx;
+            }
+
+            rackOrder.splice(curIndex,1);
+            if(targetIndex>rackOrder.length) targetIndex=rackOrder.length;
+            rackOrder.splice(targetIndex,0,id);
+            emitRackOrder();
+            endPointerDrag(); renderAll(); return;
+          }
+        }
+
+        endPointerDrag(); renderAll();
+      }
+
+      function makeTileEl(t, source, tileId, meta={}){
+        const el=document.createElement("div");
+        el.className="tile"+(t.blank?" blank":"")+(meta.ghost?" ghost":"");
+        el.textContent=(t.ch||"");
+        const pts=document.createElement("div");
+        pts.className="pts"; pts.textContent=String(t.pts??0);
+        el.appendChild(pts);
+
+        el.dataset.source = source;
+        if(tileId!=null) el.dataset.tileId=String(tileId);
+        if(meta.fromX!=null) el.dataset.fromX=String(meta.fromX);
+        if(meta.fromY!=null) el.dataset.fromY=String(meta.fromY);
+
+        el.addEventListener("pointerdown",(e)=>{
+          if(meta.ghost) return;
+
+          if(source==="fixed" && t.blank && canPlaceOnBoard()){
+            selectedBlank = { x: meta.x, y: meta.y, ch: String(t.ch||"").toLowerCase() };
+            toast(`Blank apmaiņa: izvēlies no “Tavi kauliņi” burtu "${selectedBlank.ch.toUpperCase()}"`);
+            return;
+          }
+
+          if(!state || state.role!=="player") return;
+
+          if(source==="rack" && selectedBlank && canPlaceOnBoard()){
+            const myTile = (state.myRack||[]).find(z=>String(z.id)===String(tileId));
+            const ch = String(myTile?.ch||"").toLowerCase();
+            if(myTile && !myTile.blank && ch===selectedBlank.ch){
+              e.preventDefault(); e.stopPropagation();
+              socket.emit("swapBlank",{roomId:state.roomId, x:selectedBlank.x, y:selectedBlank.y, rackTileId:tileId});
+              selectedBlank = null;
+              return;
+            }
+          }
+
+          if(source==="rack"){
+            if(!canReorderRack()) return;
+          }else if(source==="temp"){
+            if(!canPlaceOnBoard()) return;
+          }else{
+            return;
+          }
+
+          e.preventDefault();
+          e.stopPropagation();
+          ensureAudio();
+          startPointerDrag(e, el);
+        }, {passive:false});
+
+        return el;
+      }
+
+      $("clear").onclick=()=>{ if(!state||state.turnId!==state.meId||state.role!=="player") return; temp.clear(); selectedBlank=null; scheduleDraft(); renderAll(); };
+      $("pass").onclick =()=>{ if(!socket||!state||!state.started||state.turnId!==state.meId||state.role!=="player") return; temp.clear(); selectedBlank=null; socket.emit("draftClear",{roomId:state.roomId}); socket.emit("passTurn",{roomId:state.roomId}); };
+      $("exchange").onclick =()=>{
+        if(!socket||!state||!state.started||state.turnId!==state.meId||state.role!=="player") return;
+        if(!confirm("Nomainīt visus kauliņus pret jauniem? (Skaitās gājiens)")) return;
+        temp.clear(); selectedBlank=null;
+        socket.emit("draftClear",{roomId:state.roomId});
+        socket.emit("exchangeAll",{roomId:state.roomId});
+      };
+      $("leave").onclick  =()=>{
+        if(!socket||!state||state.role!=="player") return;
+        if(!confirm("Iziet no spēles? Tavi kauliņi tiks iemesti atpakaļ maisā, un tu paliksi kā skatītājs.")) return;
+        temp.clear(); selectedBlank=null;
+        socket.emit("draftClear",{roomId:state.roomId});
+        socket.emit("leaveGame",{roomId:state.roomId});
+      };
+      $("commit").onclick=()=>{
+        if(!socket||!state||!state.started||state.turnId!==state.meId||state.role!=="player") return;
+
+        const placements=[];
+        for(const [k,v] of temp.entries()){
+          const [x,y]=k.split(",").map(Number);
+          placements.push({x,y,tileId:v.tileId, as:v.as||null});
+        }
+        if(!placements.length) return;
+
+        for(const p of placements){
+          const t=(state.myRack||[]).find(r=>String(r.id)===String(p.tileId));
+          if(t?.blank){
+            let as=prompt("Blank kauliņš: kāds burts? (viens burts)");
+            if(!as) return;
+            as=as.trim().toLowerCase();
+            if(as.length!==1) return alert("Jābūt vienam burtam.");
+            p.as=as;
+            temp.set(key(p.x,p.y), {...temp.get(key(p.x,p.y)), as});
+          }
+        }
+        socket.emit("commitMove",{roomId:state.roomId, placements});
+      };
+
+      function renderPlayers(){
+        const out=$("players"); out.innerHTML="";
+        for(const p of (state.players||[])){
+          const el=document.createElement("div");
+          el.className="p" + (state.started && state.turnId===p.id ? " turnBox" : "");
+          el.innerHTML = `<div style="display:flex; justify-content:space-between;">
+            <div><b>${p.name}${p.id===state.meId?" (tu)":""}</b></div>
+            <div>Punkti: <b>${p.score}</b></div>
+          </div><div class="small">Kauliņi: ${p.rackCount}</div>`;
+          out.appendChild(el);
+        }
+        if(state.spectatorsCount){
+          const note=document.createElement("div");
+          note.className="small";
+          note.style.marginTop="8px";
+          note.textContent = `Skatītāji: ${state.spectatorsCount}`;
+          out.appendChild(note);
+        }
+      }
+
+      function renderLast3(){
+        const box=$("last3Box");
+        const list=$("last3List");
+        if(!state.started){ box.style.display="none"; return; }
+        box.style.display="";
+
+        const items = state.last3 || [];
+        if(!items.length){ list.innerHTML = "<div class='small'>—</div>"; return; }
+
+        list.innerHTML = "";
+        items.forEach(it=>{
+          const row=document.createElement("div");
+          row.className="wrow";
+          const w = String(it.word||"");
+          const meaning = String(it.meaning||"");
+          const summary = String(it.summary||"");
+          const tezaursId = String(it.tezaursId||"");
+          const lemma = String(it.lemma||"");
+          const url = tezaursId ? ("https://tezaurs.lv/" + encodeURIComponent(tezaursId)) : ("https://tezaurs.lv/" + encodeURIComponent(w + ":1"));
+
+          row.innerHTML = `
+            <div class="wtop">
+              <div>
+                <b>${w.toUpperCase()}</b>
+                <div class="small">${meaning ? meaning : "Skaidrojums nav atrasts (iespējams īpašvārds/saīsinājums)."}</div>
+                <div class="small" style="margin-top:6px;">${summary ? summary : ""}</div>
+              </div>
+              <div class="wbtns">
+                <button class="miniBtn" type="button" data-open>Atvērt</button>
+                <button class="miniBtn" type="button" data-infl ${lemma? "" : "disabled"}>Locījumi</button>
+              </div>
+            </div>
+          `;
+          row.querySelector("[data-open]").onclick = ()=> window.open(url, "_blank");
+          row.querySelector("[data-infl]").onclick = ()=> openInflections(lemma, w);
+          list.appendChild(row);
+        });
+      }
+
+      function renderBoard(){
+        const board=$("board"); board.innerHTML="";
+        const draftMap=new Map();
+        if(state.draft?.cells) for(const c of state.draft.cells) draftMap.set(key(c.x,c.y), c);
+
+        for(let y=0;y<15;y++){
+          for(let x=0;x<15;x++){
+            const cell=document.createElement("div");
+            const m=state.multLabel?.[y]?.[x]||"";
+            cell.className="cell";
+            cell.dataset.x=x; cell.dataset.y=y; cell.dataset.m=m;
+
+            const fixed=state.board?.[y]?.[x];
+            const tmp=temp.get(key(x,y));
+            const dr=draftMap.get(key(x,y));
+
+            if(fixed){
+              cell.appendChild(makeTileEl({ch:fixed.ch, pts:fixed.pts, blank:fixed.blank}, "fixed", null, {x,y}));
+            }else if(tmp && state.role==="player"){
+              const rackTile=(state.myRack||[]).find(t=>String(t.id)===String(tmp.tileId));
+              const show={ ch:(rackTile?.blank ? (tmp.as||"_") : (rackTile?.ch||"_")), pts:(rackTile?.blank?0:(rackTile?.pts||0)), blank:!!rackTile?.blank };
+              cell.appendChild(makeTileEl(show, "temp", tmp.tileId, {fromX:x, fromY:y}));
+            }else if(dr && state.draft?.by!==state.meId){
+              cell.appendChild(makeTileEl({ch:dr.ch, pts:dr.pts, blank:dr.blank}, "ghost", null, {ghost:true}));
+            }else{
+              if(m){
+                const MAP={ "TW":["3x","VĀRDS"], "DW":["2x","VĀRDS"], "TL":["3x","BURTS"], "DL":["2x","BURTS"], "★":["★"] };
+                const lab=document.createElement("div");
+                lab.className="m";
+                lab.innerHTML=(MAP[m]||[m]).map(s=>`<span>${s}</span>`).join("");
+                cell.appendChild(lab);
+              }
+            }
+            board.appendChild(cell);
+          }
+        }
+      }
+
+      function renderRack(){
+        const rack=$("rack"); rack.innerHTML="";
+        if(state.role!=="player"){ rack.innerHTML = "<div class='small'>—</div>"; return; }
+        const used=new Set([...temp.values()].map(v=>String(v.tileId)));
+        const byId=new Map((state.myRack||[]).map(t=>[String(t.id), t]));
+
+        const ids = (state.myRack||[]).map(t=>String(t.id));
+        const s1=new Set(rackOrder), s2=new Set(ids);
+        let mismatch = (rackOrder.length!==ids.length) || (s1.size!==s2.size);
+        if(!mismatch){ for(const id of s2) if(!s1.has(id)) { mismatch=true; break; } }
+        if(mismatch) rackOrder = ids.slice();
+
+        const availableIds = rackOrder.filter(id => byId.has(id) && !used.has(id));
+
+        for(const id of availableIds){
+          const t = byId.get(id);
+          const slot=document.createElement("div");
+          slot.className="rackSlot";
+          const tile=makeTileEl(t, "rack", id, {});
+          slot.appendChild(tile);
+          rack.appendChild(slot);
+        }
+        if(availableIds.length===0){
+          const hint=document.createElement("div");
+          hint.className="small";
+          hint.textContent="—";
+          rack.appendChild(hint);
+        }
+      }
+
+      function renderAll(){
+        const addBotBtn = document.getElementById("addBot");
+        if(!state) return;
+
+        setTopHudVisible(!!state.started);
+
+        const spectator = state.role==="spectator";
+        const isMyTurn = state.started && (state.turnId===state.meId);
+
+        $("spectatorBox").style.display = spectator ? "" : "none";
+        $("actions").style.display = spectator ? "none" : "";
+        $("rackTitle").textContent = spectator ? "Skatītājs" : "Tavi kauliņi";
+
+        $("turnHint").textContent = state.started
+          ? (isMyTurn && !spectator ? "Tavs gājiens ✅" : "Gaidam…")
+          : (spectator ? "Skatītājs (lobijs)" : "Lobijs");
+
+        $("waitBox").style.display = (state.started && state.turnId!==state.meId && !spectator) ? "" : "none";
+
+        $("commit").disabled = spectator || !state.started || temp.size===0 || state.turnId!==state.meId;
+        $("clear").disabled  = spectator || !state.started || temp.size===0 || state.turnId!==state.meId;
+        $("pass").disabled   = spectator || !state.started || state.turnId!==state.meId;
+        $("exchange").disabled = spectator || !state.started || state.turnId!==state.meId;
+        $("leave").disabled  = spectator || !state.started;
+
+        renderLast3();
+        renderPlayers();
+
+        // 🤖 poga redzama tikai lobijā, ja esi viens un nav "Dators"
+        if(addBotBtn){
+          const hasBot = (state.players||[]).some(p => (p.name||"") === "Dators");
+          const onlyOne = (state.players||[]).length === 1;
+          addBotBtn.style.display = (!state.started && state.role==="player" && onlyOne && !hasBot) ? "" : "none";
+        }
+
+        renderBoard();
+        renderRack();
+
+        $("lobbyControls").style.display = joined ? "" : "none";
+        $("timeRow").style.display = (!state.started && state.role==="player") ? "" : "none";
+        $("readyNotice").style.display = (!state.started && state.role==="player") ? "" : "none";
+
+        $("lbStart").style.display = joined ? "none" : "";
+        $("roomsBox").style.display = joined ? "none" : "";
+
+        $("capInfo").textContent = state.maxPlayers ? ` Maks. spēlētāji: ${state.maxPlayers}.` : "";
+      }
+
+      if(socket){
+        socket.on("effect",(e)=>{
+          if(["accepted","passed","timeout","letterDraw","exchanged","leftGame"].includes(e.type)){
+            temp.clear();
+            selectedBlank = null;
+          }
+          if(e.type==="accepted" || e.type==="exchanged" || e.type==="passed") sConfirm();
+
+          if(e.type==="letterDraw"){
+            $("startOverlay").style.display="flex";
+            const draws=e.draws||{}, order=e.order||[];
+            const list=document.createElement("div");
+            for(const p of order){
+              const line=document.createElement("div");
+              line.className="grid";
+              line.innerHTML=`<div><b>${p.name}</b></div><div class="box" id="box-${p.id}">?</div>`;
+              list.appendChild(line);
+            }
+            $("startList").innerHTML=""; $("startList").appendChild(list);
+
+            setTimeout(()=>{
+              for(const p of order){
+                const el=document.getElementById(`box-${p.id}`);
+                if(el) el.textContent=(draws[p.id]?.ch||"_").toUpperCase();
+              }
+              $("orderLine").innerHTML="Secība: " + order.map((p,i)=>`<span class="${i===0?"hl":""}">${i+1}. ${p.name}</span>`).join(" · ");
+              setTimeout(()=>$("startOverlay").style.display="none",5000);
+            }, 900);
+          }
+          renderAll();
+        });
+
+        socket.on("state",(s)=>{
+          state=s;
+
+          if(!joined && state?.meId && state?.roomId){
+            joined=true;
+            $("createRoom").style.display="none";
+            $("join").style.display="none";
+            $("room").disabled=true;
+            $("name").disabled=true;
+            $("game").style.display="";
+            $("chat").style.display="";
+            $("chat").classList.toggle("min", chatMin);
+            setChatIcon();
+            toast(state.role==="spectator"
+              ? "Pieslēdzies kā skatītājs."
+              : "Lobijs: nospied “Gatavs ✅”, lai sāktu spēli."
+            );
+          }
+
+          $("bag").textContent = (typeof s.bagCount==="number") ? s.bagCount : "—";
+          $("turnTxt").textContent = "GĀJIENS: " + (s.turnName || "—");
+
+          const total=s.players?.length||0;
+          const readyCount=s.readyIds?.length||0;
+          const drafting = (s.started && s.draft && s.draft.byName) ? ` · ${s.draft.byName} liek kauliņus…` : "";
+          $("lobbyLine").textContent = s.started ? ("Spēle sākta"+drafting) : `Gatavi: ${readyCount}/${total} — ${s.readyNames?.join(", ")||"—"}`;
+
+          if(!s.started && s.role==="player"){
+            const readySet=new Set(s.readyIds||[]);
+            $("readyList").innerHTML = (s.players||[]).map(p=>`<span class="badgeReady">${readySet.has(p.id)? "<span class='ok'>✔</span> ":"… "}${p.name}</span>`).join("");
+            const isReady=(s.readyIds||[]).includes(s.meId);
+            $("readyBtn").disabled = isReady || total<2;
+            $("turnTime").value = String(Number(s.turnTimeSec||0));
+          }else{
+            $("readyList").innerHTML = "";
+          }
+
+          $("chatStatus").textContent = s.roomId ? ("Istaba: "+s.roomId) : "—";
+          const newLen = (s.chat||[]).length;
+          const last = (s.chat||[])[newLen-1];
+          const myName = (s.players||[]).find(p=>p.id===s.meId)?.name || "";
+          if(!chatInit){ chatInit=true; prevChatLen=newLen; }
+          else{
+            const gotNew = newLen > prevChatLen;
+            prevChatLen = newLen;
+            if(gotNew && last && String(last.name||"") !== String(myName||"")){
+              sChat();
+              if(chatMin) setUnread(true);
+            }
+          }
+          const cb=$("chatBody"); cb.innerHTML="";
+          for(const m of (s.chat||[])){
+            const when=new Date(m.ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+            const el=document.createElement("div");
+            el.className="msg";
+            el.innerHTML=`<b>${m.name}</b><span>${m.msg}</span><span style="margin-left:auto;opacity:.55">${when}</span>`;
+            cb.appendChild(el);
+          }
+          cb.scrollTop=cb.scrollHeight;
+
+          renderAll();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
