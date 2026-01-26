@@ -611,7 +611,12 @@ function cacheGet(word){
 function pickBestAnalysis(word, arr){
   const w=String(word||"").toLowerCase();
   const candidates = arr.filter(a=>String(a["Šķirkļa cilvēklasāmais ID"]||"").toLowerCase().startsWith(w+":"));
-  return (candidates[0] || arr[0] || null);
+  const pool = candidates.length ? candidates : arr;
+  for(const a of pool){
+    const { isAbbrev, isProper } = looksLikeProperOrAbbrev(a);
+    if(!isAbbrev && !isProper) return a;
+  }
+  return pool[0] || null;
 }
 function stripHtmlToText(html){
   let t = String(html||"");
@@ -718,11 +723,8 @@ function looksLikeProperOrAbbrev(analysis){
   const isProper =
     blob.includes("īpašvār") ||
     blob.includes("topon") ||          // vietvārds
-    blob.includes("hidron") ||         // upes u.c.
+    blob.includes("hidron") ||         // hidronīmi
     blob.includes("apdzīv") ||         // apdzīvota vieta
-    blob.includes("pilsēt") ||
-    blob.includes("upe") ||
-    blob.includes("ezers") ||
     blob.includes("uzvār") ||
     blob.includes("personvār") ||
     blob.includes("organiz") ||

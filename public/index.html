@@ -113,6 +113,22 @@
       background: linear-gradient(180deg, rgba(49,209,122,.16), rgba(0,0,0,.22));
       box-shadow: 0 18px 40px rgba(49,209,122,.12);
     }
+    .lastPtsPop{
+      display:inline-block;
+      margin-left:8px;
+      padding:3px 8px;
+      border-radius:999px;
+      background:rgba(49,209,122,.18);
+      border:1px solid rgba(49,209,122,.45);
+      color:#dff7ea;
+      font-weight:800;
+      animation: ptsRise 1.1s ease forwards;
+    }
+    @keyframes ptsRise{
+      0%{ transform:translateY(6px); opacity:0; }
+      20%{ transform:translateY(0); opacity:1; }
+      100%{ transform:translateY(-8px); opacity:0; }
+    }
 
     .disabledHint{ margin-top:8px; padding:10px; border-radius:12px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); color:#bbb; }
     .readyRow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -630,6 +646,10 @@
       const lastMovePoints = new Map();
       const recentPlacements = new Set();
       let placementTimer = null;
+      const botDraft = new Set();
+      let botDraftTimer = null;
+      const botThinking = new Set();
+      const lastMovePulse = new Map();
 
       function emitRackOrder(){ if(!socket || !state?.roomId || state.role!=="player") return; socket.emit("reorderRack", { roomId: state.roomId, order: rackOrder.slice() }); }
       function canPlaceOnBoard(){ return !!(state && state.role==="player" && state.started && state.turnId===state.meId); }
@@ -876,13 +896,18 @@
         const out=$("players"); out.innerHTML="";
         for(const p of (state.players||[])){
           const lastPts = lastMovePoints.has(p.id) ? lastMovePoints.get(p.id) : null;
+          const thinking = botThinking.has(p.id);
+          const pulse = lastMovePulse.has(p.id);
           const el=document.createElement("div");
           el.className="p" + (state.started && state.turnId===p.id ? " turnBox" : "");
           el.innerHTML = `<div style="display:flex; justify-content:space-between;">
             <div><b>${p.name}${p.id===state.meId?" (tu)":""}</b></div>
             <div>Punkti: <b>${p.score}</b></div>
           </div><div class="small">Kauliņi: ${p.rackCount}</div>
-          <div class="small">Pēdējais gājiens: ${lastPts===null ? "—" : `+${Number(lastPts)}`} punkti</div>`;
+          <div class="small">Pēdējais gājiens: ${lastPts===null ? "—" : `+${Number(lastPts)}`} punkti
+            ${pulse && lastPts!==null ? `<span class="lastPtsPop">+${Number(lastPts)}</span>` : ""}
+          </div>
+          ${thinking ? `<div class="small">Dators domā…</div>` : ""}`;
           out.appendChild(el);
         }
         if(state.spectatorsCount){
@@ -1087,11 +1112,34 @@
             temp.clear();
             selectedBlank = null;
           }
+          if(["accepted","passed","timeout","letterDraw","exchanged","leftGame"].includes(e.type)){
+            botDraft.clear();
+            if(botDraftTimer) clearTimeout(botDraftTimer);
+          }
           if(e.type==="accepted" || e.type==="exchanged" || e.type==="passed") sConfirm();
-          if(e.type==="accepted") lastMovePoints.set(e.by, Number(e.total||0));
+          if(e.type==="accepted"){
+            lastMovePoints.set(e.by, Number(e.total||0));
+            lastMovePulse.set(e.by, Date.now());
+            setTimeout(()=>{
+              lastMovePulse.delete(e.by);
+              renderAll();
+            }, 1100);
+          }
           if(["passed","timeout","exchanged"].includes(e.type)) lastMovePoints.set(e.by, 0);
           if(e.type==="leftGame") lastMovePoints.delete(e.by);
           if(e.type==="letterDraw") lastMovePoints.clear();
+          if(e.type==="botThinking"){
+            if(String(e.status||"") === "start") botThinking.add(e.by);
+            else botThinking.delete(e.by);
+          }
+          if(e.type==="botDraft" && Array.isArray(e.placements)){
+            botDraft.clear();
+            e.placements.forEach(p=>{
+              if(p && p.x!=null && p.y!=null) botDraft.add(key(Number(p.x), Number(p.y)));
+            });
+            if(botDraftTimer) clearTimeout(botDraftTimer);
+            botDraftTimer = setTimeout(()=>{ botDraft.clear(); renderAll(); }, 900);
+          }
           if(e.type==="accepted" && Array.isArray(e.placements)){
             recentPlacements.clear();
             e.placements.forEach(p=>{
