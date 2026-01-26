@@ -7,7 +7,16 @@
   <style>
     :root{ --gap:3px; --cell: clamp(30px, calc((min(100vw, 1700px) - 480px)/15), 72px); }
     *{ box-sizing:border-box; }
-    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#1a1a1a; color:#eee; overflow-x:hidden; }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:
+        radial-gradient(circle at top, rgba(53,123,255,.15), transparent 40%),
+        radial-gradient(circle at 20% 40%, rgba(49,209,122,.18), transparent 35%),
+        #101014;
+      color:#eee;
+      overflow-x:hidden;
+    }
     .container{ max-width:min(1700px,98vw); margin:10px auto; padding:0 14px 18px; }
     .topbar{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; font-weight:900; letter-spacing:.8px; gap:10px; flex-wrap:wrap; }
     .turn{ text-align:center; flex:1; color:#31d17a; min-width:240px; }
@@ -17,7 +26,7 @@
     .subtop{ display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; color:#bbb; font-size:13px; flex-wrap:wrap; }
     .hidden{ display:none !important; }
 
-    .card{ border-radius:16px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); padding:12px; }
+    .card{ border-radius:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); padding:12px; box-shadow:0 24px 80px rgba(0,0,0,.45); }
     .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     input,button{ padding:10px 12px; font-size:15px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25); color:#eee; outline:none; }
     button{ cursor:pointer; background:rgba(255,255,255,.12); position:relative; z-index:10; touch-action:manipulation; pointer-events:auto; }
@@ -28,6 +37,29 @@
     .pillBtn{ padding:8px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20); font-weight:900; display:inline-flex; gap:10px; align-items:center; }
     .small{ font-size:13px; color:#cfcfcf; }
     #toast{ min-height:18px; }
+
+    .hero{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:center;
+      padding:14px 16px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(135deg, rgba(43,62,96,.55), rgba(25,25,25,.45));
+      margin-top:12px;
+    }
+    .heroTitle{ font-size:22px; font-weight:900; letter-spacing:.4px; }
+    .heroSub{ color:#cfcfcf; margin-top:6px; font-size:14px; }
+    .heroBadges{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .heroBadge{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.25);
+      font-size:12px;
+      font-weight:800;
+    }
 
     .wrap{ display:grid; grid-template-columns:max-content minmax(360px,480px); gap:14px; margin-top:12px; justify-content:center; align-items:start; }
     @media (max-width:1100px){ .wrap{ grid-template-columns:1fr; } }
@@ -135,9 +167,61 @@
     .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.60); display:none; align-items:center; justify-content:center; z-index:99999; }
     .panel{ width:min(860px,92vw); border-radius:18px; background:rgba(15,15,15,.92); border:1px solid rgba(255,255,255,.12); padding:14px; box-shadow:0 30px 90px rgba(0,0,0,.65); }
     .title{ font-weight:950; letter-spacing:.5px; }
-    .grid{ display:grid; grid-template-columns:1fr 90px; gap:10px; margin-top:10px; }
-    .box{ width:72px; height:72px; border-radius:16px; background:linear-gradient(180deg,#fff,#d9d9d9); color:#111; display:flex; align-items:center; justify-content:center;
-      font-weight:950; font-size:34px; border:1px solid rgba(0,0,0,.25); box-shadow:0 16px 30px rgba(0,0,0,.35); }
+    .grid{ display:grid; grid-template-columns:1fr 96px; gap:10px; margin-top:10px; align-items:center; }
+    .box{
+      width:84px;
+      height:84px;
+      border-radius:18px;
+      background:linear-gradient(180deg,#fff,#d9d9d9);
+      color:#111;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:950;
+      font-size:34px;
+      border:1px solid rgba(0,0,0,.25);
+      box-shadow:0 16px 30px rgba(0,0,0,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .dropTile{
+      position:absolute;
+      top:-120px;
+      width:64px;
+      height:64px;
+      border-radius:14px;
+      background:linear-gradient(180deg,#fff8ea,#e7d4b0);
+      box-shadow:0 20px 40px rgba(0,0,0,.35);
+      border:1px solid rgba(0,0,0,.2);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:30px;
+      text-transform:uppercase;
+    }
+    .dropTile.drop{ animation: dropIn .65s cubic-bezier(.2,.7,.25,1.02) forwards; }
+    @keyframes dropIn{
+      0%{ transform:translateY(-120px) scale(.9); }
+      65%{ transform:translateY(30px) scale(1.05); }
+      100%{ transform:translateY(10px) scale(1); }
+    }
+    .dropShadow{
+      position:absolute;
+      bottom:12px;
+      width:60px;
+      height:16px;
+      border-radius:999px;
+      background:rgba(0,0,0,.25);
+      filter:blur(6px);
+      opacity:0;
+    }
+    .dropShadow.show{ animation: shadowIn .65s ease forwards; }
+    @keyframes shadowIn{
+      0%{ opacity:0; transform:scale(.2); }
+      65%{ opacity:.35; transform:scale(1); }
+      100%{ opacity:.25; transform:scale(.9); }
+    }
     .orderLine{ margin-top:10px; color:#ddd; }
     .hl{ color:#31d17a; font-weight:900; }
     .goList{ margin-top:8px; }
@@ -175,6 +259,18 @@
 
         <button id="audioBtn" class="pillBtn" type="button" aria-label="Audio ieslēgšana vai izslēgšana">Audio: <span id="audioState">🔇</span></button>
         <span class="small" id="toast"></span>
+      </div>
+
+      <div class="hero" id="lobbyHero">
+        <div>
+          <div class="heroTitle">Spēlē Burtnieku tiešsaistē</div>
+          <div class="heroSub">Ātri izveido istabu, pievieno datoru vai sacenties ar draugiem.</div>
+        </div>
+        <div class="heroBadges">
+          <span class="heroBadge">4 spēlētāji</span>
+          <span class="heroBadge">Tūlītējs starts</span>
+          <span class="heroBadge">Top spēles vēsture</span>
+        </div>
       </div>
 
       <div class="lb" id="quickStartBox">
@@ -980,6 +1076,7 @@
         $("lbStart").style.display = joined ? "none" : "";
         $("roomsBox").style.display = joined ? "none" : "";
         $("quickStartBox").style.display = joined ? "none" : "";
+        $("lobbyHero").style.display = joined ? "none" : "";
 
         $("capInfo").textContent = state.maxPlayers ? ` Maks. spēlētāji: ${state.maxPlayers}.` : "";
       }
@@ -1051,19 +1148,26 @@
             for(const p of order){
               const line=document.createElement("div");
               line.className="grid";
-              line.innerHTML=`<div><b>${p.name}</b></div><div class="box" id="box-${p.id}">?</div>`;
+              line.innerHTML=`<div><b>${p.name}</b></div><div class="box" id="box-${p.id}"><div class="dropShadow" id="shadow-${p.id}"></div><div class="dropTile" id="tile-${p.id}">?</div></div>`;
               list.appendChild(line);
             }
             $("startList").innerHTML=""; $("startList").appendChild(list);
 
             setTimeout(()=>{
-              for(const p of order){
-                const el=document.getElementById(`box-${p.id}`);
-                if(el) el.textContent=(draws[p.id]?.ch||"_").toUpperCase();
-              }
+              order.forEach((p, idx)=>{
+                const tile=document.getElementById(`tile-${p.id}`);
+                const shadow=document.getElementById(`shadow-${p.id}`);
+                if(!tile) return;
+                const letter=(draws[p.id]?.ch||"_").toUpperCase();
+                setTimeout(()=>{
+                  tile.textContent=letter;
+                  tile.classList.add("drop");
+                  if(shadow) shadow.classList.add("show");
+                }, 200 + idx * 180);
+              });
               $("orderLine").innerHTML="Secība: " + order.map((p,i)=>`<span class="${i===0?"hl":""}">${i+1}. ${p.name}</span>`).join(" · ");
-              setTimeout(()=>$("startOverlay").style.display="none",5000);
-            }, 900);
+              setTimeout(()=>$("startOverlay").style.display="none",5200);
+            }, 500);
           }
           renderAll();
         });

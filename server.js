@@ -852,6 +852,47 @@ app.get("/api/inflections", async (req,res)=>{
 function makeBotId(roomId){ return "__BOT__" + String(roomId||""); }
 function isBotId(id){ return String(id||"").startsWith("__BOT__"); }
 
+const BOT_WORDS_FILE = path.join(__dirname, "bot_words.txt");
+let cachedBotWords = null;
+function loadBotWords(){
+  if(cachedBotWords) return cachedBotWords;
+  try{
+    const raw = fs.readFileSync(BOT_WORDS_FILE, "utf8");
+    cachedBotWords = raw
+      .split(/\r?\n/)
+      .map(w=>w.trim().toLowerCase())
+      .filter(w=>w && !w.startsWith("#"))
+      .filter(w=>w.length>=2 && w.length<=7);
+  }catch{
+    cachedBotWords = [];
+  }
+  return cachedBotWords;
+}
+
+function canFormWordFromRack(word, rack){
+  const counts = new Map();
+  let blanks = 0;
+  for(const t of rack || []){
+    if(t.blank) blanks += 1;
+    else{
+      const ch = String(t.ch||"").toLowerCase();
+      counts.set(ch, (counts.get(ch) || 0) + 1);
+    }
+  }
+  for(const ch of String(word||"").toLowerCase()){
+    if(!ch) continue;
+    const n = counts.get(ch) || 0;
+    if(n > 0){
+      counts.set(ch, n - 1);
+    }else if(blanks > 0){
+      blanks -= 1;
+    }else{
+      return false;
+    }
+  }
+  return true;
+}
+
 function ensureBot(roomId){
   const room = rooms.get(roomId);
   if(!room) return null;
@@ -990,26 +1031,37 @@ async function botTakeTurn(roomId){
   // ja nav rack — pievelkam
   if(!bot.rack || bot.rack.length<7) bot.rack = (bot.rack||[]).concat(drawTiles(room, Math.max(0,7-(bot.rack||[]).length)));
 
-  // kandidāti
-  const candidates = genCandidateWordsFromRack(bot.rack, 220);
+  const botWordList = loadBotWords();
+  let listCandidates = botWordList.filter(w=>canFormWordFromRack(w, bot.rack));
+  if(listCandidates.length > 80){
+    listCandidates = listCandidates.sort(()=>Math.random()-0.5).slice(0, 80);
+  }
+
+  // kandidāti (ja nav lokālās vārdnīcas vai tajā nav atbilstošu)
+  const candidates = listCandidates.length ? listCandidates : genCandidateWordsFromRack(bot.rack, 220);
 
   // filtrējam ar verifyWordStrict (stingri)
   const okWords = [];
   const fallbackWords = [];
   let tezaursDown = false;
   for(const w of candidates){
-    const check = await verifyWordStrict(w);
-    if(check.ok){
+    if(listCandidates.length){
       okWords.push(w);
+      if(okWords.length>=60) break;
     }else{
-      const reason = String(check.reason || "");
-      if(reason.toLowerCase().includes("tezaurs")){
-        fallbackWords.push(w);
-        tezaursDown = true;
-        break;
+      const check = await verifyWordStrict(w);
+      if(check.ok){
+        okWords.push(w);
+      }else{
+        const reason = String(check.reason || "");
+        if(reason.toLowerCase().includes("tezaurs")){
+          fallbackWords.push(w);
+          tezaursDown = true;
+          break;
+        }
       }
+      if(okWords.length>=60) break;
     }
-    if(okWords.length>=60) break;
   }
   const usableWords = okWords.length
     ? okWords
