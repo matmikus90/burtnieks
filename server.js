@@ -87,6 +87,8 @@ function makeRoom(){
     lastGameOver: null,
     passStreak: new Map(),
     last3: [],
+    botThinking: false,
+    gameHistory: [],
   };
 }
 
@@ -287,25 +289,30 @@ function startTurnTimer(roomId){
   const room=rooms.get(roomId);
   if(!room) return;
   stopTurnTimer(room);
-  if(!room.started || !room.turnTimeSec || room.turnTimeSec<=0 || room.turnOrder.length===0) return;
+  if(!room.started || room.turnOrder.length===0) return;
 
-  room.turnEndsAt = Date.now() + room.turnTimeSec*1000;
-  room.turnTimeout = setTimeout(()=>{
-    if(!room.started) return;
-    const by=currentTurnId(room);
-    const byName=by && room.players.get(by) ? room.players.get(by).name : "?";
+  if(room.turnTimeSec && room.turnTimeSec>0){
+    room.turnEndsAt = Date.now() + room.turnTimeSec*1000;
+    room.turnTimeout = setTimeout(()=>{
+      if(!room.started) return;
+      const by=currentTurnId(room);
+      const byName=by && room.players.get(by) ? room.players.get(by).name : "?";
 
-    if(by){
-      room.passStreak.set(by, (room.passStreak.get(by)||0) + 1);
-      checkAllPassedTwice(roomId);
-    }
+      if(by){
+        room.passStreak.set(by, (room.passStreak.get(by)||0) + 1);
+        checkAllPassedTwice(roomId);
+      }
 
-    io.to(roomId).emit("effect",{type:"timeout", by, byName});
-    room.draft=null;
-    room.turnIndex = (room.turnIndex+1) % room.turnOrder.length;
-    startTurnTimer(roomId);
-    emitState(roomId);
-  }, room.turnTimeSec*1000);
+      io.to(roomId).emit("effect",{type:"timeout", by, byName});
+      room.draft=null;
+      room.turnIndex = (room.turnIndex+1) % room.turnOrder.length;
+      startTurnTimer(roomId);
+      emitState(roomId);
+    }, room.turnTimeSec*1000);
+  }else{
+    room.turnEndsAt = null;
+  }
+  triggerBotTurn(roomId);
 }
 
 function roomsSummary(){
@@ -339,6 +346,7 @@ function emitState(roomId){
   const draftPublic = room.draft ? { by:room.draft.by, byName:room.draft.byName, cells:room.draft.cells, ts:room.draft.ts } : null;
   const chatPublic = room.chat.slice(-50);
   const last3Public = (room.last3||[]).slice(0,3);
+  const gameHistory = (room.gameHistory || []).slice(0,5);
 
   for(const [viewerId, viewer] of room.players.entries()){
     if(typeof isBotId==='function' && isBotId(viewerId)) continue;
@@ -361,7 +369,8 @@ function emitState(roomId){
       leaderboardTop: topWins(10),
       spectatorsCount: room.spectators.size,
       maxPlayers: MAX_PLAYERS,
-      last3: last3Public
+      last3: last3Public,
+      gameHistory
     });
   }
 
@@ -386,7 +395,8 @@ function emitState(roomId){
       spectatorsCount: room.spectators.size,
       maxPlayers: MAX_PLAYERS,
       spectatorName: spec?.name || "Skatītājs",
-      last3: last3Public
+      last3: last3Public,
+      gameHistory
     });
   }
 }
@@ -480,9 +490,12 @@ function finalizeGame(roomId, reason){
   stopTurnTimer(room);
   room.draft=null;
 
-  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason };
+  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason, deductions: [] };
+  room.gameHistory = [
+    { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason }
+  ].concat(room.gameHistory || []).slice(0,5);
 
-  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, final, durationMs, reason });
+  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, final, durationMs, reason, deductions: [] });
   emitState(roomId);
   emitRoomsList();
 }
@@ -504,9 +517,15 @@ function endByEmptyRack(roomId, winnerId){
   if(!winner) return;
 
   let transfer=0;
+  const deductions = [];
   for(const [id,p] of room.players.entries()){
     if(id===winnerId) continue;
-    transfer += (p.rack||[]).reduce((s,t)=>s+(t.pts||0),0);
+    const penalty = (p.rack||[]).reduce((s,t)=>s+(t.pts||0),0);
+    transfer += penalty;
+    if(penalty){
+      p.score -= penalty;
+    }
+    deductions.push({ name: p.name, points: penalty });
   }
   winner.score += transfer;
 
@@ -522,9 +541,12 @@ function endByEmptyRack(roomId, winnerId){
   stopTurnTimer(room);
   room.draft=null;
 
-  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, transfer, final, at: Date.now(), durationMs, reason:"Beidzās kauliņi" };
+  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, transfer, final, at: Date.now(), durationMs, reason:"Beidzās kauliņi", deductions };
+  room.gameHistory = [
+    { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason:"Beidzās kauliņi", deductions }
+  ].concat(room.gameHistory || []).slice(0,5);
 
-  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, transfer, final, durationMs, reason:"Beidzās kauliņi" });
+  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, transfer, final, durationMs, reason:"Beidzās kauliņi", deductions });
   emitState(roomId);
   emitRoomsList();
 }
@@ -543,6 +565,25 @@ function removePlayerFromTurnOrder(room, pid){
     if(room.turnIndex>=room.turnOrder.length) room.turnIndex=0;
     if(idx<room.turnIndex) room.turnIndex=Math.max(0,room.turnIndex-1);
   }
+}
+
+function triggerBotTurn(roomId){
+  const room = rooms.get(roomId);
+  if(!room || !room.started) return;
+  const botId = makeBotId(roomId);
+  if(!room.players.has(botId)) return;
+  if(currentTurnId(room) !== botId) return;
+  if(room.botThinking) return;
+
+  room.botThinking = true;
+  setTimeout(async ()=>{
+    try{
+      await botTakeTurn(roomId);
+    }finally{
+      const liveRoom = rooms.get(roomId);
+      if(liveRoom) liveRoom.botThinking = false;
+    }
+  }, 200);
 }
 
 /* -------------------- Tezaurs (NEBLOĶĒ gājienu) -------------------- */
@@ -570,7 +611,12 @@ function cacheGet(word){
 function pickBestAnalysis(word, arr){
   const w=String(word||"").toLowerCase();
   const candidates = arr.filter(a=>String(a["Šķirkļa cilvēklasāmais ID"]||"").toLowerCase().startsWith(w+":"));
-  return (candidates[0] || arr[0] || null);
+  const pool = candidates.length ? candidates : arr;
+  for(const a of pool){
+    const { isAbbrev, isProper } = looksLikeProperOrAbbrev(a);
+    if(!isAbbrev && !isProper) return a;
+  }
+  return pool[0] || null;
 }
 function stripHtmlToText(html){
   let t = String(html||"");
@@ -677,11 +723,8 @@ function looksLikeProperOrAbbrev(analysis){
   const isProper =
     blob.includes("īpašvār") ||
     blob.includes("topon") ||          // vietvārds
-    blob.includes("hidron") ||         // upes u.c.
+    blob.includes("hidron") ||         // hidronīmi
     blob.includes("apdzīv") ||         // apdzīvota vieta
-    blob.includes("pilsēt") ||
-    blob.includes("upe") ||
-    blob.includes("ezers") ||
     blob.includes("uzvār") ||
     blob.includes("personvār") ||
     blob.includes("organiz") ||
@@ -811,6 +854,47 @@ app.get("/api/inflections", async (req,res)=>{
 function makeBotId(roomId){ return "__BOT__" + String(roomId||""); }
 function isBotId(id){ return String(id||"").startsWith("__BOT__"); }
 
+const BOT_WORDS_FILE = path.join(__dirname, "bot_words.txt");
+let cachedBotWords = null;
+function loadBotWords(){
+  if(cachedBotWords) return cachedBotWords;
+  try{
+    const raw = fs.readFileSync(BOT_WORDS_FILE, "utf8");
+    cachedBotWords = raw
+      .split(/\r?\n/)
+      .map(w=>w.trim().toLowerCase())
+      .filter(w=>w && !w.startsWith("#"))
+      .filter(w=>w.length>=2 && w.length<=7);
+  }catch{
+    cachedBotWords = [];
+  }
+  return cachedBotWords;
+}
+
+function canFormWordFromRack(word, rack){
+  const counts = new Map();
+  let blanks = 0;
+  for(const t of rack || []){
+    if(t.blank) blanks += 1;
+    else{
+      const ch = String(t.ch||"").toLowerCase();
+      counts.set(ch, (counts.get(ch) || 0) + 1);
+    }
+  }
+  for(const ch of String(word||"").toLowerCase()){
+    if(!ch) continue;
+    const n = counts.get(ch) || 0;
+    if(n > 0){
+      counts.set(ch, n - 1);
+    }else if(blanks > 0){
+      blanks -= 1;
+    }else{
+      return false;
+    }
+  }
+  return true;
+}
+
 function ensureBot(roomId){
   const room = rooms.get(roomId);
   if(!room) return null;
@@ -934,6 +1018,48 @@ function tryPlaceWordAt(room, botId, word, startX, startY, dx, dy){
   return { placements, score: res.total, words: res.words };
 }
 
+async function tryBotWord(room, botId, word){
+  const empty = isBoardEmpty(room);
+  let best = null;
+
+  if(empty){
+    for(let i=0;i<word.length;i++){
+      const startX = 7 - i;
+      const startY = 7;
+      const move = tryPlaceWordAt(room, botId, word, startX, startY, 1, 0);
+      if(move && (!best || move.score > best.score)) best = { ...move, word };
+    }
+  }else{
+    for(let y=0;y<15;y++){
+      for(let x=0;x<15;x++){
+        const fixed = room.board[y][x];
+        if(!fixed) continue;
+        const fixedCh = String(fixed.ch||"").toLowerCase();
+        for(let i=0;i<word.length;i++){
+          if(word[i] !== fixedCh) continue;
+          let startX = x - i, startY = y;
+          let mv1 = tryPlaceWordAt(room, botId, word, startX, startY, 1, 0);
+          if(mv1 && (!best || mv1.score > best.score)) best = { ...mv1, word };
+          startX = x; startY = y - i;
+          let mv2 = tryPlaceWordAt(room, botId, word, startX, startY, 0, 1);
+          if(mv2 && (!best || mv2.score > best.score)) best = { ...mv2, word };
+        }
+      }
+    }
+  }
+
+  if(!best) return null;
+  const madeStrict = [...new Set((best.words||[])
+    .map(w=>String(w.word||"").toLowerCase())
+    .filter(w=>w && w!=="bonus")
+  )];
+  for(const w of madeStrict){
+    const check = await verifyWordStrict(w);
+    if(!check.ok) return null;
+  }
+  return best;
+}
+
 async function botTakeTurn(roomId){
   const room = rooms.get(roomId);
   if(!room || !room.started) return;
@@ -949,57 +1075,46 @@ async function botTakeTurn(roomId){
   // ja nav rack — pievelkam
   if(!bot.rack || bot.rack.length<7) bot.rack = (bot.rack||[]).concat(drawTiles(room, Math.max(0,7-(bot.rack||[]).length)));
 
-  // kandidāti
-  const candidates = genCandidateWordsFromRack(bot.rack, 220);
+  const botWordList = loadBotWords();
+  let listCandidates = botWordList.filter(w=>canFormWordFromRack(w, bot.rack));
+  if(listCandidates.length > 80){
+    listCandidates = listCandidates.sort(()=>Math.random()-0.5).slice(0, 80);
+  }
+
+  // kandidāti (ja nav lokālās vārdnīcas vai tajā nav atbilstošu)
+  const candidates = listCandidates.length ? listCandidates : genCandidateWordsFromRack(bot.rack, 220);
 
   // filtrējam ar verifyWordStrict (stingri)
   const okWords = [];
+  const fallbackWords = [];
+  let tezaursDown = false;
   for(const w of candidates){
-    const check = await verifyWordStrict(w);
-    if(check.ok) okWords.push(w);
-    if(okWords.length>=60) break;
-  }
-
-  let best = null;
-
-  const empty = isBoardEmpty(room);
-
-  if(empty){
-    // pirmais vārds caur centru horizontāli
-    for(const w of okWords){
-      // lai iet caur (7,7): izvēlamies startX tā, lai kāds burts iekrīt centrā
-      for(let i=0;i<w.length;i++){
-        const startX = 7 - i;
-        const startY = 7;
-        const move = tryPlaceWordAt(room, botId, w, startX, startY, 1, 0);
-        if(move && (!best || move.score > best.score)) best = { ...move, word:w };
-      }
-    }
-  }else{
-    // meklējam krustošanu ar esošajiem burtiem: pārskrienam pa laukumu un mēģinam krustot
-    for(let y=0;y<15;y++){
-      for(let x=0;x<15;x++){
-        const fixed = room.board[y][x];
-        if(!fixed) continue;
-        const fixedCh = String(fixed.ch||"").toLowerCase();
-
-        for(const w of okWords){
-          for(let i=0;i<w.length;i++){
-            if(w[i] !== fixedCh) continue;
-
-            // horizontāli (krustojot)
-            let startX = x - i, startY = y;
-            let mv1 = tryPlaceWordAt(room, botId, w, startX, startY, 1, 0);
-            if(mv1 && (!best || mv1.score > best.score)) best = { ...mv1, word:w };
-
-            // vertikāli
-            startX = x; startY = y - i;
-            let mv2 = tryPlaceWordAt(room, botId, w, startX, startY, 0, 1);
-            if(mv2 && (!best || mv2.score > best.score)) best = { ...mv2, word:w };
-          }
+    if(listCandidates.length){
+      okWords.push(w);
+      if(okWords.length>=60) break;
+    }else{
+      const check = await verifyWordStrict(w);
+      if(check.ok){
+        okWords.push(w);
+      }else{
+        const reason = String(check.reason || "");
+        if(reason.toLowerCase().includes("tezaurs")){
+          fallbackWords.push(w);
+          tezaursDown = true;
+          break;
         }
       }
+      if(okWords.length>=60) break;
     }
+  }
+  const usableWords = okWords.length
+    ? okWords
+    : (tezaursDown ? candidates.slice(0, 60) : fallbackWords.slice(0, 60));
+
+  let best = null;
+  for(const w of usableWords){
+    const attempt = await tryBotWord(room, botId, w);
+    if(attempt && (!best || attempt.score > best.score)) best = attempt;
   }
 
   if(!best){
@@ -1029,7 +1144,7 @@ async function botTakeTurn(roomId){
   bot.score += best.score;
 
   // “accepted” efekts (lai redz animāciju)
-  io.to(roomId).emit("effect",{type:"accepted", by:botId, byName:bot.name, total:best.score, words:best.words, hits:[]});
+  io.to(roomId).emit("effect",{type:"accepted", by:botId, byName:bot.name, total:best.score, words:best.words, hits:[], placements: best.placements.map(p=>({x:p.x,y:p.y}))});
 
   // validateAndScoreMove jau pārbaudīja, tagad jāpielieto placements
   // lai nav dubulta parse, uztaisām placementsMap atkārtoti, izmantojot validateAndScoreMove vēlreiz (droši)
@@ -1037,6 +1152,25 @@ async function botTakeTurn(roomId){
   if(res2.ok){
     applyMove(room, botId, res2.placements, res2.placementsMap);
   }
+
+  const made = [...new Set((best.words||[]).map(w=>String(w.word||"").toLowerCase()).filter(w=>w && w!=="bonus"))];
+  for(const w of made){
+    const strict = await verifyWordStrict(w);
+    if(!strict.ok) continue;
+    const info = await infoFromTezaurs(w);
+    const m = (strict.morph || info.morph || {});
+    room.last3.unshift({
+      word: w,
+      tezaursId: (strict.tezaursId || info.tezaursId || (w+":1")),
+      lemma: (strict.lemma || info.lemma || w),
+      meaning: info.meaning || "",
+      morph: m,
+      summary: info.summary || "",
+      byName: bot.name,
+      ts: Date.now()
+    });
+  }
+  room.last3 = room.last3.slice(0,3);
 
   bot.rack = bot.rack || [];
   room.passStreak.set(botId, 0);
@@ -1368,7 +1502,7 @@ socket.on("setTurnTime",({roomId,sec})=>{
     }
     room.last3 = room.last3.slice(0,3);
 
-    io.to(roomId).emit("effect",{type:"accepted", by:socket.id, byName:player.name, total:res.total, words:res.words, hits});
+    io.to(roomId).emit("effect",{type:"accepted", by:socket.id, byName:player.name, total:res.total, words:res.words, hits, placements: res.placements.map(p=>({x:p.x,y:p.y}))});
 
     if((player.rack?.length||0)===0) return endByEmptyRack(roomId, socket.id);
 

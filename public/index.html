@@ -7,7 +7,16 @@
   <style>
     :root{ --gap:3px; --cell: clamp(30px, calc((min(100vw, 1700px) - 480px)/15), 72px); }
     *{ box-sizing:border-box; }
-    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#1a1a1a; color:#eee; overflow-x:hidden; }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:
+        radial-gradient(circle at top, rgba(53,123,255,.15), transparent 40%),
+        radial-gradient(circle at 20% 40%, rgba(49,209,122,.18), transparent 35%),
+        #101014;
+      color:#eee;
+      overflow-x:hidden;
+    }
     .container{ max-width:min(1700px,98vw); margin:10px auto; padding:0 14px 18px; }
     .topbar{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; font-weight:900; letter-spacing:.8px; gap:10px; flex-wrap:wrap; }
     .turn{ text-align:center; flex:1; color:#31d17a; min-width:240px; }
@@ -17,7 +26,7 @@
     .subtop{ display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; color:#bbb; font-size:13px; flex-wrap:wrap; }
     .hidden{ display:none !important; }
 
-    .card{ border-radius:16px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); padding:12px; }
+    .card{ border-radius:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); padding:12px; box-shadow:0 24px 80px rgba(0,0,0,.45); }
     .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     input,button{ padding:10px 12px; font-size:15px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25); color:#eee; outline:none; }
     button{ cursor:pointer; background:rgba(255,255,255,.12); position:relative; z-index:10; touch-action:manipulation; pointer-events:auto; }
@@ -26,8 +35,31 @@
     #commit{ background:linear-gradient(180deg, rgba(49,209,122,.55), rgba(49,209,122,.18)); border-color:rgba(49,209,122,.45); }
     #commit:hover{ filter:brightness(1.08); }
     .pillBtn{ padding:8px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20); font-weight:900; display:inline-flex; gap:10px; align-items:center; }
-    .small{ font-size:13px; color:#bbb; }
+    .small{ font-size:13px; color:#cfcfcf; }
     #toast{ min-height:18px; }
+
+    .hero{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:center;
+      padding:14px 16px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(135deg, rgba(43,62,96,.55), rgba(25,25,25,.45));
+      margin-top:12px;
+    }
+    .heroTitle{ font-size:22px; font-weight:900; letter-spacing:.4px; }
+    .heroSub{ color:#cfcfcf; margin-top:6px; font-size:14px; }
+    .heroBadges{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .heroBadge{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.25);
+      font-size:12px;
+      font-weight:800;
+    }
 
     .wrap{ display:grid; grid-template-columns:max-content minmax(360px,480px); gap:14px; margin-top:12px; justify-content:center; align-items:start; }
     @media (max-width:1100px){ .wrap{ grid-template-columns:1fr; } }
@@ -53,6 +85,16 @@
       font-size: clamp(16px, calc(var(--cell) * 0.41), 34px);
       letter-spacing: .5px;
       text-transform: uppercase;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .tile.placed{
+      animation: popIn .28s ease;
+      box-shadow:0 10px 20px rgba(0,0,0,.45);
+    }
+    @keyframes popIn{
+      0%{ transform: scale(.92); }
+      70%{ transform: scale(1.06); }
+      100%{ transform: scale(1); }
     }
     .tile:active{ cursor:grabbing; }
     .pts{ position:absolute; bottom:4px; right:6px; font-size:11px; font-weight:950; color:rgba(0,0,0,.65); }
@@ -70,6 +112,22 @@
       border-color: rgba(49,209,122,.55);
       background: linear-gradient(180deg, rgba(49,209,122,.16), rgba(0,0,0,.22));
       box-shadow: 0 18px 40px rgba(49,209,122,.12);
+    }
+    .lastPtsPop{
+      display:inline-block;
+      margin-left:8px;
+      padding:3px 8px;
+      border-radius:999px;
+      background:rgba(49,209,122,.18);
+      border:1px solid rgba(49,209,122,.45);
+      color:#dff7ea;
+      font-weight:800;
+      animation: ptsRise 1.1s ease forwards;
+    }
+    @keyframes ptsRise{
+      0%{ transform:translateY(6px); opacity:0; }
+      20%{ transform:translateY(0); opacity:1; }
+      100%{ transform:translateY(-8px); opacity:0; }
     }
 
     .disabledHint{ margin-top:8px; padding:10px; border-radius:12px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); color:#bbb; }
@@ -125,11 +183,123 @@
     .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.60); display:none; align-items:center; justify-content:center; z-index:99999; }
     .panel{ width:min(860px,92vw); border-radius:18px; background:rgba(15,15,15,.92); border:1px solid rgba(255,255,255,.12); padding:14px; box-shadow:0 30px 90px rgba(0,0,0,.65); }
     .title{ font-weight:950; letter-spacing:.5px; }
-    .grid{ display:grid; grid-template-columns:1fr 90px; gap:10px; margin-top:10px; }
-    .box{ width:72px; height:72px; border-radius:16px; background:linear-gradient(180deg,#fff,#d9d9d9); color:#111; display:flex; align-items:center; justify-content:center;
-      font-weight:950; font-size:34px; border:1px solid rgba(0,0,0,.25); box-shadow:0 16px 30px rgba(0,0,0,.35); }
+    .celebrate{
+      position:relative;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      background:radial-gradient(circle at 30% 20%, rgba(255,215,128,.25), transparent 45%),
+        linear-gradient(180deg, rgba(35,35,40,.9), rgba(15,15,15,.95));
+      padding:16px;
+      margin-top:12px;
+    }
+    .confetti{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+    }
+    .confetti span{
+      position:absolute;
+      width:8px;
+      height:14px;
+      border-radius:2px;
+      opacity:.85;
+      animation: confettiFall 3.8s linear infinite;
+    }
+    .confetti span:nth-child(odd){ width:6px; height:10px; animation-duration:3.2s; }
+    @keyframes confettiFall{
+      0%{ transform:translateY(-40px) rotate(0deg); opacity:0; }
+      10%{ opacity:1; }
+      100%{ transform:translateY(260px) rotate(360deg); opacity:0; }
+    }
+    .cake{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:22px;
+      font-weight:900;
+      color:#ffd28c;
+    }
+    .podium{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:10px;
+      margin-top:12px;
+      align-items:end;
+    }
+    .podiumStep{
+      border-radius:14px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12);
+      padding:10px;
+      text-align:center;
+      min-height:80px;
+    }
+    .podiumStep.gold{ background:linear-gradient(180deg, rgba(255,215,128,.35), rgba(30,30,30,.6)); border-color:rgba(255,215,128,.5); }
+    .podiumStep.silver{ background:linear-gradient(180deg, rgba(200,200,220,.28), rgba(30,30,30,.6)); border-color:rgba(200,200,220,.45); }
+    .podiumStep.bronze{ background:linear-gradient(180deg, rgba(210,140,90,.28), rgba(30,30,30,.6)); border-color:rgba(210,140,90,.45); }
+    .podiumStep b{ display:block; margin-bottom:4px; }
+    .celebrateBtns{ display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:14px; }
+    .grid{ display:grid; grid-template-columns:1fr 96px; gap:10px; margin-top:10px; align-items:center; }
+    .box{
+      width:84px;
+      height:84px;
+      border-radius:18px;
+      background:linear-gradient(180deg,#fff,#d9d9d9);
+      color:#111;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:950;
+      font-size:34px;
+      border:1px solid rgba(0,0,0,.25);
+      box-shadow:0 16px 30px rgba(0,0,0,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .dropTile{
+      position:absolute;
+      top:-120px;
+      width:64px;
+      height:64px;
+      border-radius:14px;
+      background:linear-gradient(180deg,#fff8ea,#e7d4b0);
+      box-shadow:0 20px 40px rgba(0,0,0,.35);
+      border:1px solid rgba(0,0,0,.2);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:30px;
+      text-transform:uppercase;
+    }
+    .dropTile.drop{ animation: dropIn .65s cubic-bezier(.2,.7,.25,1.02) forwards; }
+    @keyframes dropIn{
+      0%{ transform:translateY(-120px) scale(.9); }
+      65%{ transform:translateY(30px) scale(1.05); }
+      100%{ transform:translateY(10px) scale(1); }
+    }
+    .dropShadow{
+      position:absolute;
+      bottom:12px;
+      width:60px;
+      height:16px;
+      border-radius:999px;
+      background:rgba(0,0,0,.25);
+      filter:blur(6px);
+      opacity:0;
+    }
+    .dropShadow.show{ animation: shadowIn .65s ease forwards; }
+    @keyframes shadowIn{
+      0%{ opacity:0; transform:scale(.2); }
+      65%{ opacity:.35; transform:scale(1); }
+      100%{ opacity:.25; transform:scale(.9); }
+    }
     .orderLine{ margin-top:10px; color:#ddd; }
     .hl{ color:#31d17a; font-weight:900; }
+    .goList{ margin-top:8px; }
+    .goRow{ display:flex; justify-content:space-between; padding:6px 10px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); margin-bottom:6px; }
+    .goRow b{ letter-spacing:.4px; }
 
     @media (max-width: 640px){
       :root{ --gap:2px; --cell: clamp(24px, calc((100vw - 32px)/15), 40px); }
@@ -154,14 +324,35 @@
 
     <div class="card">
       <div class="row">
-        <input id="name" placeholder="Tavs vārds (unikāls)" />
-        <button id="createRoom" type="button">Izveidot istabu</button>
+        <input id="name" placeholder="Tavs vārds (unikāls)" aria-label="Spēlētāja vārds" />
+        <button id="createRoom" type="button" aria-label="Izveidot jaunu istabu">Izveidot istabu</button>
 
-        <input id="room" placeholder="Istaba (ja pievienojies)" />
-        <button id="join" type="button">Pievienoties istabai</button>
+        <input id="room" placeholder="Istaba (ja pievienojies)" aria-label="Istabas kods" />
+        <button id="join" type="button" aria-label="Pievienoties esošai istabai">Pievienoties istabai</button>
 
-        <button id="audioBtn" class="pillBtn" type="button">Audio: <span id="audioState">🔇</span></button>
+        <button id="audioBtn" class="pillBtn" type="button" aria-label="Audio ieslēgšana vai izslēgšana">Audio: <span id="audioState">🔇</span></button>
         <span class="small" id="toast"></span>
+      </div>
+
+      <div class="hero" id="lobbyHero">
+        <div>
+          <div class="heroTitle">Spēlē Burtnieku tiešsaistē</div>
+          <div class="heroSub">Ātri izveido istabu, pievieno datoru vai sacenties ar draugiem.</div>
+        </div>
+        <div class="heroBadges">
+          <span class="heroBadge">4 spēlētāji</span>
+          <span class="heroBadge">Tūlītējs starts</span>
+          <span class="heroBadge">Top spēles vēsture</span>
+        </div>
+      </div>
+
+      <div class="lb" id="quickStartBox">
+        <h3>Ātrais starts</h3>
+        <div class="small">
+          1) Ievadi vārdu un izveido istabu vai pievienojies esošai.<br />
+          2) Nospied “Gatavs ✅”, lai sāktu spēli.<br />
+          3) Ja esi viens, vari pievienot “Datoru 🤖”.
+        </div>
       </div>
 
       <div class="lb" id="lbStart">
@@ -222,6 +413,11 @@
           <div id="last3List"><div class="small">—</div></div>
         </div>
 
+        <div class="last3" id="historyBox" style="display:none;">
+          <h3>Pēdējās spēles (5)</h3>
+          <div id="historyList"><div class="small">—</div></div>
+        </div>
+
         <div style="margin-top:14px;"><b>Spēlētāji</b></div>
         <div id="players" class="players"></div>
 
@@ -271,6 +467,49 @@
       <div class="mono" id="inflBody" style="margin-top:10px; max-height:55vh; overflow:auto;"></div>
       <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
         <button id="inflClose" type="button" class="danger">Aizvērt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay">
+    <div class="panel">
+      <div class="title">Spēle beigusies</div>
+      <div class="small" id="gameOverReason">—</div>
+      <div class="celebrate">
+        <div class="confetti" aria-hidden="true">
+          <span style="left:5%; background:#ffd28c; animation-delay:.2s;"></span>
+          <span style="left:12%; background:#7fc0ff; animation-delay:.6s;"></span>
+          <span style="left:20%; background:#31d17a; animation-delay:1.2s;"></span>
+          <span style="left:30%; background:#ff8e8e; animation-delay:.4s;"></span>
+          <span style="left:42%; background:#ffd28c; animation-delay:1.1s;"></span>
+          <span style="left:55%; background:#b790ff; animation-delay:.9s;"></span>
+          <span style="left:66%; background:#7fc0ff; animation-delay:.7s;"></span>
+          <span style="left:78%; background:#31d17a; animation-delay:1.4s;"></span>
+          <span style="left:90%; background:#ff8e8e; animation-delay:1.0s;"></span>
+        </div>
+        <div class="cake">🎂 Zelta kūka uzvarētājam</div>
+        <div class="row" style="margin-top:8px; justify-content:space-between; align-items:baseline;">
+          <div><b>Uzvarētājs:</b> <span id="gameOverWinner">—</span></div>
+          <div class="small" id="gameOverDuration">—</div>
+        </div>
+        <div class="podium" id="podiumList">
+          <div class="podiumStep silver"><b>2.</b><div class="small">—</div></div>
+          <div class="podiumStep gold"><b>1.</b><div class="small">—</div></div>
+          <div class="podiumStep bronze"><b>3.</b><div class="small">—</div></div>
+        </div>
+      </div>
+      <div class="lb" style="margin-top:10px;">
+        <h3>Gala rezultāts</h3>
+        <div id="gameOverFinal" class="goList"><div class="small">—</div></div>
+      </div>
+      <div class="lb" style="margin-top:10px;">
+        <h3>Atskaitītie punkti</h3>
+        <div id="gameOverDeductions" class="goList"><div class="small">—</div></div>
+      </div>
+      <div class="celebrateBtns">
+        <button id="gameOverPlay" type="button">Spēlēt vēlreiz</button>
+        <button id="gameOverLobby" type="button">Uz lobiju</button>
+        <button id="gameOverClose" type="button" class="danger">Aizvērt</button>
       </div>
     </div>
   </div>
@@ -399,6 +638,8 @@
       }
       function sChat(){ playTone([{f:880,a:0.09,d:0.10},{f:740,a:0.08,d:0.10,gap:0.04}]); }
       function sConfirm(){ playTone([{f:660,a:0.10,d:0.12},{f:990,a:0.08,d:0.12,gap:0.03}]); }
+      function sTurnStart(){ playTone([{f:520,a:0.10,d:0.12},{f:820,a:0.08,d:0.14,gap:0.04}]); }
+      function sTick(){ playTone([{f:960,a:0.06,d:0.06,gap:0.02}]); }
 
       function fmtMS(ms){
         ms=Math.max(0,ms|0); const s=Math.floor(ms/1000);
@@ -414,12 +655,23 @@
       }
       setTopHudVisible(false);
 
+      let lastTickSecond = null;
       setInterval(()=>{
         if(!state){ $("timerLine").textContent="Gājiena laiks: —"; $("gameTimeLine").textContent="Spēles laiks: —"; $("rackTimer").textContent="—"; return; }
+        const isMyTurn = state.started && state.turnId===state.meId && state.role==="player";
         let turnText="Atlikušais laiks: ∞";
         if(state.started && state.turnEndsAt && state.turnTimeSec && state.turnTimeSec>0){
           const left=Math.max(0, Math.ceil((state.turnEndsAt-Date.now())/1000));
           turnText=`Atlikušais laiks: ${left}s`;
+
+          if(isMyTurn && left<=10 && left>0){
+            if(lastTickSecond !== left){
+              lastTickSecond = left;
+              sTick();
+            }
+          }else if(!isMyTurn || left>10){
+            lastTickSecond = null;
+          }
         }
         $("rackTimer").textContent = state.started ? turnText : "—";
 
@@ -449,6 +701,19 @@
       }
 
       $("inflClose").onclick = ()=>{ $("inflOverlay").style.display="none"; };
+      $("gameOverClose").onclick = ()=>{ $("gameOverOverlay").style.display="none"; };
+      $("gameOverPlay").onclick = ()=>{
+        $("gameOverOverlay").style.display="none";
+        if(socket && state?.roomId && state.role==="player" && !state.started){
+          socket.emit("readyStart",{roomId:state.roomId});
+        }
+      };
+      $("gameOverLobby").onclick = ()=>{
+        $("gameOverOverlay").style.display="none";
+        if(socket && state?.roomId && state.role==="player"){
+          socket.emit("leaveGame",{roomId:state.roomId});
+        }
+      };
       async function openInflections(lemma, word){
         if(!lemma) return toast("Nav lemma.");
         $("inflTitle").textContent = `Locījumi: ${String(word||lemma).toUpperCase()}`;
@@ -468,6 +733,13 @@
       const temp = new Map();
       let selectedBlank = null;
       const drag = { active:false, tileId:null, from:null, fromX:null, fromY:null, el:null, ghost:null };
+      const lastMovePoints = new Map();
+      const recentPlacements = new Set();
+      let placementTimer = null;
+      const botDraft = new Set();
+      let botDraftTimer = null;
+      const botThinking = new Set();
+      const lastMovePulse = new Map();
 
       function emitRackOrder(){ if(!socket || !state?.roomId || state.role!=="player") return; socket.emit("reorderRack", { roomId: state.roomId, order: rackOrder.slice() }); }
       function canPlaceOnBoard(){ return !!(state && state.role==="player" && state.started && state.turnId===state.meId); }
@@ -713,12 +985,19 @@
       function renderPlayers(){
         const out=$("players"); out.innerHTML="";
         for(const p of (state.players||[])){
+          const lastPts = lastMovePoints.has(p.id) ? lastMovePoints.get(p.id) : null;
+          const thinking = botThinking.has(p.id);
+          const pulse = lastMovePulse.has(p.id);
           const el=document.createElement("div");
           el.className="p" + (state.started && state.turnId===p.id ? " turnBox" : "");
           el.innerHTML = `<div style="display:flex; justify-content:space-between;">
             <div><b>${p.name}${p.id===state.meId?" (tu)":""}</b></div>
             <div>Punkti: <b>${p.score}</b></div>
-          </div><div class="small">Kauliņi: ${p.rackCount}</div>`;
+          </div><div class="small">Kauliņi: ${p.rackCount}</div>
+          <div class="small">Pēdējais gājiens: ${lastPts===null ? "—" : `+${Number(lastPts)}`} punkti
+            ${pulse && lastPts!==null ? `<span class="lastPtsPop">+${Number(lastPts)}</span>` : ""}
+          </div>
+          ${thinking ? `<div class="small">Dators domā…</div>` : ""}`;
           out.appendChild(el);
         }
         if(state.spectatorsCount){
@@ -769,6 +1048,33 @@
         });
       }
 
+      function renderHistory(){
+        const box=$("historyBox");
+        const list=$("historyList");
+        const items = state.gameHistory || [];
+        if(!items.length){
+          box.style.display="none";
+          return;
+        }
+        box.style.display="";
+        list.innerHTML = "";
+        items.forEach((it, idx)=>{
+          const row=document.createElement("div");
+          row.className="wrow";
+          const duration = typeof it.durationMs === "number" ? fmtMS(it.durationMs) : "—";
+          const reason = it.reason ? ` · ${it.reason}` : "";
+          row.innerHTML = `
+            <div class="wtop">
+              <div>
+                <b>${idx+1}. ${String(it.winnerName||"—")}</b>
+                <div class="small">Uzvara: ${Number(it.winnerScore||0)} pts · Ilgums: ${duration}${reason}</div>
+              </div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+      }
+
       function renderBoard(){
         const board=$("board"); board.innerHTML="";
         const draftMap=new Map();
@@ -786,7 +1092,9 @@
             const dr=draftMap.get(key(x,y));
 
             if(fixed){
-              cell.appendChild(makeTileEl({ch:fixed.ch, pts:fixed.pts, blank:fixed.blank}, "fixed", null, {x,y}));
+              const tile=makeTileEl({ch:fixed.ch, pts:fixed.pts, blank:fixed.blank}, "fixed", null, {x,y});
+              if(recentPlacements.has(key(x,y))) tile.classList.add("placed");
+              cell.appendChild(tile);
             }else if(tmp && state.role==="player"){
               const rackTile=(state.myRack||[]).find(t=>String(t.id)===String(tmp.tileId));
               const show={ ch:(rackTile?.blank ? (tmp.as||"_") : (rackTile?.ch||"_")), pts:(rackTile?.blank?0:(rackTile?.pts||0)), blank:!!rackTile?.blank };
@@ -863,6 +1171,7 @@
         $("leave").disabled  = spectator || !state.started;
 
         renderLast3();
+        renderHistory();
         renderPlayers();
 
         // 🤖 poga redzama tikai lobijā, ja esi viens un nav "Dators"
@@ -881,6 +1190,8 @@
 
         $("lbStart").style.display = joined ? "none" : "";
         $("roomsBox").style.display = joined ? "none" : "";
+        $("quickStartBox").style.display = joined ? "none" : "";
+        $("lobbyHero").style.display = joined ? "none" : "";
 
         $("capInfo").textContent = state.maxPlayers ? ` Maks. spēlētāji: ${state.maxPlayers}.` : "";
       }
@@ -891,7 +1202,97 @@
             temp.clear();
             selectedBlank = null;
           }
+          if(["accepted","passed","timeout","letterDraw","exchanged","leftGame"].includes(e.type)){
+            botDraft.clear();
+            if(botDraftTimer) clearTimeout(botDraftTimer);
+          }
           if(e.type==="accepted" || e.type==="exchanged" || e.type==="passed") sConfirm();
+          if(e.type==="accepted"){
+            lastMovePoints.set(e.by, Number(e.total||0));
+            lastMovePulse.set(e.by, Date.now());
+            setTimeout(()=>{
+              lastMovePulse.delete(e.by);
+              renderAll();
+            }, 1100);
+          }
+          if(["passed","timeout","exchanged"].includes(e.type)) lastMovePoints.set(e.by, 0);
+          if(e.type==="leftGame") lastMovePoints.delete(e.by);
+          if(e.type==="letterDraw") lastMovePoints.clear();
+          if(e.type==="botThinking"){
+            if(String(e.status||"") === "start") botThinking.add(e.by);
+            else botThinking.delete(e.by);
+          }
+          if(e.type==="botDraft" && Array.isArray(e.placements)){
+            botDraft.clear();
+            e.placements.forEach(p=>{
+              if(p && p.x!=null && p.y!=null) botDraft.add(key(Number(p.x), Number(p.y)));
+            });
+            if(botDraftTimer) clearTimeout(botDraftTimer);
+            botDraftTimer = setTimeout(()=>{ botDraft.clear(); renderAll(); }, 900);
+          }
+          if(e.type==="accepted" && Array.isArray(e.placements)){
+            recentPlacements.clear();
+            e.placements.forEach(p=>{
+              if(p && p.x!=null && p.y!=null) recentPlacements.add(key(Number(p.x), Number(p.y)));
+            });
+            if(placementTimer) clearTimeout(placementTimer);
+            placementTimer = setTimeout(()=>{ recentPlacements.clear(); renderAll(); }, 600);
+          }
+
+          if(e.type==="gameOver"){
+            $("gameOverReason").textContent = e.reason ? `Iemesls: ${e.reason}` : "Iemesls: —";
+            $("gameOverWinner").textContent = e.winnerName ? `${e.winnerName} (${e.winnerScore} pts)` : "—";
+            if(typeof e.durationMs === "number"){
+              $("gameOverDuration").textContent = "Ilgums: " + fmtMS(e.durationMs);
+            }else{
+              $("gameOverDuration").textContent = "Ilgums: —";
+            }
+
+            const finalBox = $("gameOverFinal");
+            const final = Array.isArray(e.final) ? e.final : [];
+            const podium = $("podiumList");
+            if(podium){
+              const podiumSlots = [
+                podium.querySelector(".gold .small"),
+                podium.querySelector(".silver .small"),
+                podium.querySelector(".bronze .small")
+              ];
+              if(final.length){
+                if(podiumSlots[0]) podiumSlots[0].textContent = final[0] ? `${final[0].name} (${final[0].score} pts)` : "—";
+                if(podiumSlots[1]) podiumSlots[1].textContent = final[1] ? `${final[1].name} (${final[1].score} pts)` : "—";
+                if(podiumSlots[2]) podiumSlots[2].textContent = final[2] ? `${final[2].name} (${final[2].score} pts)` : "—";
+              }else{
+                podiumSlots.forEach(slot=>{ if(slot) slot.textContent="—"; });
+              }
+            }
+            if(!final.length){
+              finalBox.innerHTML = "<div class='small'>—</div>";
+            }else{
+              finalBox.innerHTML = "";
+              final.forEach((p, idx)=>{
+                const row=document.createElement("div");
+                row.className="goRow";
+                row.innerHTML = `<div><b>${idx+1}. ${p.name}</b></div><div>${p.score} pts</div>`;
+                finalBox.appendChild(row);
+              });
+            }
+
+            const dedBox = $("gameOverDeductions");
+            const deductions = Array.isArray(e.deductions) ? e.deductions : [];
+            if(!deductions.length){
+              dedBox.innerHTML = "<div class='small'>Nav atskaitījumu.</div>";
+            }else{
+              dedBox.innerHTML = "";
+              deductions.forEach(d=>{
+                const row=document.createElement("div");
+                row.className="goRow";
+                row.innerHTML = `<div><b>${d.name}</b></div><div>-${d.points} pts</div>`;
+                dedBox.appendChild(row);
+              });
+            }
+
+            $("gameOverOverlay").style.display="flex";
+          }
 
           if(e.type==="letterDraw"){
             $("startOverlay").style.display="flex";
@@ -900,25 +1301,39 @@
             for(const p of order){
               const line=document.createElement("div");
               line.className="grid";
-              line.innerHTML=`<div><b>${p.name}</b></div><div class="box" id="box-${p.id}">?</div>`;
+              line.innerHTML=`<div><b>${p.name}</b></div><div class="box" id="box-${p.id}"><div class="dropShadow" id="shadow-${p.id}"></div><div class="dropTile" id="tile-${p.id}">?</div></div>`;
               list.appendChild(line);
             }
             $("startList").innerHTML=""; $("startList").appendChild(list);
 
             setTimeout(()=>{
-              for(const p of order){
-                const el=document.getElementById(`box-${p.id}`);
-                if(el) el.textContent=(draws[p.id]?.ch||"_").toUpperCase();
-              }
+              order.forEach((p, idx)=>{
+                const tile=document.getElementById(`tile-${p.id}`);
+                const shadow=document.getElementById(`shadow-${p.id}`);
+                if(!tile) return;
+                const letter=(draws[p.id]?.ch||"_").toUpperCase();
+                setTimeout(()=>{
+                  tile.textContent=letter;
+                  tile.classList.add("drop");
+                  if(shadow) shadow.classList.add("show");
+                }, 200 + idx * 180);
+              });
               $("orderLine").innerHTML="Secība: " + order.map((p,i)=>`<span class="${i===0?"hl":""}">${i+1}. ${p.name}</span>`).join(" · ");
-              setTimeout(()=>$("startOverlay").style.display="none",5000);
-            }, 900);
+              setTimeout(()=>$("startOverlay").style.display="none",5200);
+            }, 500);
           }
           renderAll();
         });
 
         socket.on("state",(s)=>{
+          const prevStarted = state?.started;
+          const prevTurnId = state?.turnId;
           state=s;
+
+          if(!joined){
+            const nameEl = $("name");
+            if(nameEl && !nameEl.value) nameEl.focus();
+          }
 
           if(!joined && state?.meId && state?.roomId){
             joined=true;
@@ -976,6 +1391,16 @@
             cb.appendChild(el);
           }
           cb.scrollTop=cb.scrollHeight;
+
+          const isMyTurn = state.started && state.turnId===state.meId && state.role==="player";
+          if(state.started && isMyTurn && (!prevStarted || prevTurnId !== state.turnId)){
+            sTurnStart();
+            lastTickSecond = null;
+          }
+          if(!state.started && prevStarted){
+            lastMovePoints.clear();
+            lastTickSecond = null;
+          }
 
           renderAll();
         });
