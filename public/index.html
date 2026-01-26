@@ -26,7 +26,7 @@
     #commit{ background:linear-gradient(180deg, rgba(49,209,122,.55), rgba(49,209,122,.18)); border-color:rgba(49,209,122,.45); }
     #commit:hover{ filter:brightness(1.08); }
     .pillBtn{ padding:8px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.20); font-weight:900; display:inline-flex; gap:10px; align-items:center; }
-    .small{ font-size:13px; color:#bbb; }
+    .small{ font-size:13px; color:#cfcfcf; }
     #toast{ min-height:18px; }
 
     .wrap{ display:grid; grid-template-columns:max-content minmax(360px,480px); gap:14px; margin-top:12px; justify-content:center; align-items:start; }
@@ -53,6 +53,16 @@
       font-size: clamp(16px, calc(var(--cell) * 0.41), 34px);
       letter-spacing: .5px;
       text-transform: uppercase;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .tile.placed{
+      animation: popIn .28s ease;
+      box-shadow:0 10px 20px rgba(0,0,0,.45);
+    }
+    @keyframes popIn{
+      0%{ transform: scale(.92); }
+      70%{ transform: scale(1.06); }
+      100%{ transform: scale(1); }
     }
     .tile:active{ cursor:grabbing; }
     .pts{ position:absolute; bottom:4px; right:6px; font-size:11px; font-weight:950; color:rgba(0,0,0,.65); }
@@ -130,6 +140,9 @@
       font-weight:950; font-size:34px; border:1px solid rgba(0,0,0,.25); box-shadow:0 16px 30px rgba(0,0,0,.35); }
     .orderLine{ margin-top:10px; color:#ddd; }
     .hl{ color:#31d17a; font-weight:900; }
+    .goList{ margin-top:8px; }
+    .goRow{ display:flex; justify-content:space-between; padding:6px 10px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); margin-bottom:6px; }
+    .goRow b{ letter-spacing:.4px; }
 
     @media (max-width: 640px){
       :root{ --gap:2px; --cell: clamp(24px, calc((100vw - 32px)/15), 40px); }
@@ -154,14 +167,23 @@
 
     <div class="card">
       <div class="row">
-        <input id="name" placeholder="Tavs vārds (unikāls)" />
-        <button id="createRoom" type="button">Izveidot istabu</button>
+        <input id="name" placeholder="Tavs vārds (unikāls)" aria-label="Spēlētāja vārds" />
+        <button id="createRoom" type="button" aria-label="Izveidot jaunu istabu">Izveidot istabu</button>
 
-        <input id="room" placeholder="Istaba (ja pievienojies)" />
-        <button id="join" type="button">Pievienoties istabai</button>
+        <input id="room" placeholder="Istaba (ja pievienojies)" aria-label="Istabas kods" />
+        <button id="join" type="button" aria-label="Pievienoties esošai istabai">Pievienoties istabai</button>
 
-        <button id="audioBtn" class="pillBtn" type="button">Audio: <span id="audioState">🔇</span></button>
+        <button id="audioBtn" class="pillBtn" type="button" aria-label="Audio ieslēgšana vai izslēgšana">Audio: <span id="audioState">🔇</span></button>
         <span class="small" id="toast"></span>
+      </div>
+
+      <div class="lb" id="quickStartBox">
+        <h3>Ātrais starts</h3>
+        <div class="small">
+          1) Ievadi vārdu un izveido istabu vai pievienojies esošai.<br />
+          2) Nospied “Gatavs ✅”, lai sāktu spēli.<br />
+          3) Ja esi viens, vari pievienot “Datoru 🤖”.
+        </div>
       </div>
 
       <div class="lb" id="lbStart">
@@ -222,6 +244,11 @@
           <div id="last3List"><div class="small">—</div></div>
         </div>
 
+        <div class="last3" id="historyBox" style="display:none;">
+          <h3>Pēdējās spēles (5)</h3>
+          <div id="historyList"><div class="small">—</div></div>
+        </div>
+
         <div style="margin-top:14px;"><b>Spēlētāji</b></div>
         <div id="players" class="players"></div>
 
@@ -271,6 +298,28 @@
       <div class="mono" id="inflBody" style="margin-top:10px; max-height:55vh; overflow:auto;"></div>
       <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
         <button id="inflClose" type="button" class="danger">Aizvērt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay">
+    <div class="panel">
+      <div class="title">Spēle beigusies</div>
+      <div class="small" id="gameOverReason">—</div>
+      <div class="row" style="margin-top:10px; justify-content:space-between; align-items:baseline;">
+        <div><b>Uzvarētājs:</b> <span id="gameOverWinner">—</span></div>
+        <div class="small" id="gameOverDuration">—</div>
+      </div>
+      <div class="lb" style="margin-top:10px;">
+        <h3>Gala rezultāts</h3>
+        <div id="gameOverFinal" class="goList"><div class="small">—</div></div>
+      </div>
+      <div class="lb" style="margin-top:10px;">
+        <h3>Atskaitītie punkti</h3>
+        <div id="gameOverDeductions" class="goList"><div class="small">—</div></div>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+        <button id="gameOverClose" type="button" class="danger">Aizvērt</button>
       </div>
     </div>
   </div>
@@ -399,6 +448,8 @@
       }
       function sChat(){ playTone([{f:880,a:0.09,d:0.10},{f:740,a:0.08,d:0.10,gap:0.04}]); }
       function sConfirm(){ playTone([{f:660,a:0.10,d:0.12},{f:990,a:0.08,d:0.12,gap:0.03}]); }
+      function sTurnStart(){ playTone([{f:520,a:0.10,d:0.12},{f:820,a:0.08,d:0.14,gap:0.04}]); }
+      function sTick(){ playTone([{f:960,a:0.06,d:0.06,gap:0.02}]); }
 
       function fmtMS(ms){
         ms=Math.max(0,ms|0); const s=Math.floor(ms/1000);
@@ -414,12 +465,23 @@
       }
       setTopHudVisible(false);
 
+      let lastTickSecond = null;
       setInterval(()=>{
         if(!state){ $("timerLine").textContent="Gājiena laiks: —"; $("gameTimeLine").textContent="Spēles laiks: —"; $("rackTimer").textContent="—"; return; }
+        const isMyTurn = state.started && state.turnId===state.meId && state.role==="player";
         let turnText="Atlikušais laiks: ∞";
         if(state.started && state.turnEndsAt && state.turnTimeSec && state.turnTimeSec>0){
           const left=Math.max(0, Math.ceil((state.turnEndsAt-Date.now())/1000));
           turnText=`Atlikušais laiks: ${left}s`;
+
+          if(isMyTurn && left<=10 && left>0){
+            if(lastTickSecond !== left){
+              lastTickSecond = left;
+              sTick();
+            }
+          }else if(!isMyTurn || left>10){
+            lastTickSecond = null;
+          }
         }
         $("rackTimer").textContent = state.started ? turnText : "—";
 
@@ -449,6 +511,7 @@
       }
 
       $("inflClose").onclick = ()=>{ $("inflOverlay").style.display="none"; };
+      $("gameOverClose").onclick = ()=>{ $("gameOverOverlay").style.display="none"; };
       async function openInflections(lemma, word){
         if(!lemma) return toast("Nav lemma.");
         $("inflTitle").textContent = `Locījumi: ${String(word||lemma).toUpperCase()}`;
@@ -468,6 +531,9 @@
       const temp = new Map();
       let selectedBlank = null;
       const drag = { active:false, tileId:null, from:null, fromX:null, fromY:null, el:null, ghost:null };
+      const lastMovePoints = new Map();
+      const recentPlacements = new Set();
+      let placementTimer = null;
 
       function emitRackOrder(){ if(!socket || !state?.roomId || state.role!=="player") return; socket.emit("reorderRack", { roomId: state.roomId, order: rackOrder.slice() }); }
       function canPlaceOnBoard(){ return !!(state && state.role==="player" && state.started && state.turnId===state.meId); }
@@ -713,12 +779,14 @@
       function renderPlayers(){
         const out=$("players"); out.innerHTML="";
         for(const p of (state.players||[])){
+          const lastPts = lastMovePoints.has(p.id) ? lastMovePoints.get(p.id) : null;
           const el=document.createElement("div");
           el.className="p" + (state.started && state.turnId===p.id ? " turnBox" : "");
           el.innerHTML = `<div style="display:flex; justify-content:space-between;">
             <div><b>${p.name}${p.id===state.meId?" (tu)":""}</b></div>
             <div>Punkti: <b>${p.score}</b></div>
-          </div><div class="small">Kauliņi: ${p.rackCount}</div>`;
+          </div><div class="small">Kauliņi: ${p.rackCount}</div>
+          <div class="small">Pēdējais gājiens: ${lastPts===null ? "—" : `+${Number(lastPts)}`} punkti</div>`;
           out.appendChild(el);
         }
         if(state.spectatorsCount){
@@ -769,6 +837,33 @@
         });
       }
 
+      function renderHistory(){
+        const box=$("historyBox");
+        const list=$("historyList");
+        const items = state.gameHistory || [];
+        if(!items.length){
+          box.style.display="none";
+          return;
+        }
+        box.style.display="";
+        list.innerHTML = "";
+        items.forEach((it, idx)=>{
+          const row=document.createElement("div");
+          row.className="wrow";
+          const duration = typeof it.durationMs === "number" ? fmtMS(it.durationMs) : "—";
+          const reason = it.reason ? ` · ${it.reason}` : "";
+          row.innerHTML = `
+            <div class="wtop">
+              <div>
+                <b>${idx+1}. ${String(it.winnerName||"—")}</b>
+                <div class="small">Uzvara: ${Number(it.winnerScore||0)} pts · Ilgums: ${duration}${reason}</div>
+              </div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+      }
+
       function renderBoard(){
         const board=$("board"); board.innerHTML="";
         const draftMap=new Map();
@@ -786,7 +881,9 @@
             const dr=draftMap.get(key(x,y));
 
             if(fixed){
-              cell.appendChild(makeTileEl({ch:fixed.ch, pts:fixed.pts, blank:fixed.blank}, "fixed", null, {x,y}));
+              const tile=makeTileEl({ch:fixed.ch, pts:fixed.pts, blank:fixed.blank}, "fixed", null, {x,y});
+              if(recentPlacements.has(key(x,y))) tile.classList.add("placed");
+              cell.appendChild(tile);
             }else if(tmp && state.role==="player"){
               const rackTile=(state.myRack||[]).find(t=>String(t.id)===String(tmp.tileId));
               const show={ ch:(rackTile?.blank ? (tmp.as||"_") : (rackTile?.ch||"_")), pts:(rackTile?.blank?0:(rackTile?.pts||0)), blank:!!rackTile?.blank };
@@ -863,6 +960,7 @@
         $("leave").disabled  = spectator || !state.started;
 
         renderLast3();
+        renderHistory();
         renderPlayers();
 
         // 🤖 poga redzama tikai lobijā, ja esi viens un nav "Dators"
@@ -881,6 +979,7 @@
 
         $("lbStart").style.display = joined ? "none" : "";
         $("roomsBox").style.display = joined ? "none" : "";
+        $("quickStartBox").style.display = joined ? "none" : "";
 
         $("capInfo").textContent = state.maxPlayers ? ` Maks. spēlētāji: ${state.maxPlayers}.` : "";
       }
@@ -892,6 +991,58 @@
             selectedBlank = null;
           }
           if(e.type==="accepted" || e.type==="exchanged" || e.type==="passed") sConfirm();
+          if(e.type==="accepted") lastMovePoints.set(e.by, Number(e.total||0));
+          if(["passed","timeout","exchanged"].includes(e.type)) lastMovePoints.set(e.by, 0);
+          if(e.type==="leftGame") lastMovePoints.delete(e.by);
+          if(e.type==="letterDraw") lastMovePoints.clear();
+          if(e.type==="accepted" && Array.isArray(e.placements)){
+            recentPlacements.clear();
+            e.placements.forEach(p=>{
+              if(p && p.x!=null && p.y!=null) recentPlacements.add(key(Number(p.x), Number(p.y)));
+            });
+            if(placementTimer) clearTimeout(placementTimer);
+            placementTimer = setTimeout(()=>{ recentPlacements.clear(); renderAll(); }, 600);
+          }
+
+          if(e.type==="gameOver"){
+            $("gameOverReason").textContent = e.reason ? `Iemesls: ${e.reason}` : "Iemesls: —";
+            $("gameOverWinner").textContent = e.winnerName ? `${e.winnerName} (${e.winnerScore} pts)` : "—";
+            if(typeof e.durationMs === "number"){
+              $("gameOverDuration").textContent = "Ilgums: " + fmtMS(e.durationMs);
+            }else{
+              $("gameOverDuration").textContent = "Ilgums: —";
+            }
+
+            const finalBox = $("gameOverFinal");
+            const final = Array.isArray(e.final) ? e.final : [];
+            if(!final.length){
+              finalBox.innerHTML = "<div class='small'>—</div>";
+            }else{
+              finalBox.innerHTML = "";
+              final.forEach((p, idx)=>{
+                const row=document.createElement("div");
+                row.className="goRow";
+                row.innerHTML = `<div><b>${idx+1}. ${p.name}</b></div><div>${p.score} pts</div>`;
+                finalBox.appendChild(row);
+              });
+            }
+
+            const dedBox = $("gameOverDeductions");
+            const deductions = Array.isArray(e.deductions) ? e.deductions : [];
+            if(!deductions.length){
+              dedBox.innerHTML = "<div class='small'>Nav atskaitījumu.</div>";
+            }else{
+              dedBox.innerHTML = "";
+              deductions.forEach(d=>{
+                const row=document.createElement("div");
+                row.className="goRow";
+                row.innerHTML = `<div><b>${d.name}</b></div><div>-${d.points} pts</div>`;
+                dedBox.appendChild(row);
+              });
+            }
+
+            $("gameOverOverlay").style.display="flex";
+          }
 
           if(e.type==="letterDraw"){
             $("startOverlay").style.display="flex";
@@ -918,7 +1069,14 @@
         });
 
         socket.on("state",(s)=>{
+          const prevStarted = state?.started;
+          const prevTurnId = state?.turnId;
           state=s;
+
+          if(!joined){
+            const nameEl = $("name");
+            if(nameEl && !nameEl.value) nameEl.focus();
+          }
 
           if(!joined && state?.meId && state?.roomId){
             joined=true;
@@ -976,6 +1134,16 @@
             cb.appendChild(el);
           }
           cb.scrollTop=cb.scrollHeight;
+
+          const isMyTurn = state.started && state.turnId===state.meId && state.role==="player";
+          if(state.started && isMyTurn && (!prevStarted || prevTurnId !== state.turnId)){
+            sTurnStart();
+            lastTickSecond = null;
+          }
+          if(!state.started && prevStarted){
+            lastMovePoints.clear();
+            lastTickSecond = null;
+          }
 
           renderAll();
         });

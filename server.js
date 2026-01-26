@@ -87,6 +87,8 @@ function makeRoom(){
     lastGameOver: null,
     passStreak: new Map(),
     last3: [],
+    botThinking: false,
+    gameHistory: [],
   };
 }
 
@@ -287,25 +289,30 @@ function startTurnTimer(roomId){
   const room=rooms.get(roomId);
   if(!room) return;
   stopTurnTimer(room);
-  if(!room.started || !room.turnTimeSec || room.turnTimeSec<=0 || room.turnOrder.length===0) return;
+  if(!room.started || room.turnOrder.length===0) return;
 
-  room.turnEndsAt = Date.now() + room.turnTimeSec*1000;
-  room.turnTimeout = setTimeout(()=>{
-    if(!room.started) return;
-    const by=currentTurnId(room);
-    const byName=by && room.players.get(by) ? room.players.get(by).name : "?";
+  if(room.turnTimeSec && room.turnTimeSec>0){
+    room.turnEndsAt = Date.now() + room.turnTimeSec*1000;
+    room.turnTimeout = setTimeout(()=>{
+      if(!room.started) return;
+      const by=currentTurnId(room);
+      const byName=by && room.players.get(by) ? room.players.get(by).name : "?";
 
-    if(by){
-      room.passStreak.set(by, (room.passStreak.get(by)||0) + 1);
-      checkAllPassedTwice(roomId);
-    }
+      if(by){
+        room.passStreak.set(by, (room.passStreak.get(by)||0) + 1);
+        checkAllPassedTwice(roomId);
+      }
 
-    io.to(roomId).emit("effect",{type:"timeout", by, byName});
-    room.draft=null;
-    room.turnIndex = (room.turnIndex+1) % room.turnOrder.length;
-    startTurnTimer(roomId);
-    emitState(roomId);
-  }, room.turnTimeSec*1000);
+      io.to(roomId).emit("effect",{type:"timeout", by, byName});
+      room.draft=null;
+      room.turnIndex = (room.turnIndex+1) % room.turnOrder.length;
+      startTurnTimer(roomId);
+      emitState(roomId);
+    }, room.turnTimeSec*1000);
+  }else{
+    room.turnEndsAt = null;
+  }
+  triggerBotTurn(roomId);
 }
 
 function roomsSummary(){
@@ -339,6 +346,7 @@ function emitState(roomId){
   const draftPublic = room.draft ? { by:room.draft.by, byName:room.draft.byName, cells:room.draft.cells, ts:room.draft.ts } : null;
   const chatPublic = room.chat.slice(-50);
   const last3Public = (room.last3||[]).slice(0,3);
+  const gameHistory = (room.gameHistory || []).slice(0,5);
 
   for(const [viewerId, viewer] of room.players.entries()){
     if(typeof isBotId==='function' && isBotId(viewerId)) continue;
@@ -361,7 +369,8 @@ function emitState(roomId){
       leaderboardTop: topWins(10),
       spectatorsCount: room.spectators.size,
       maxPlayers: MAX_PLAYERS,
-      last3: last3Public
+      last3: last3Public,
+      gameHistory
     });
   }
 
@@ -386,7 +395,8 @@ function emitState(roomId){
       spectatorsCount: room.spectators.size,
       maxPlayers: MAX_PLAYERS,
       spectatorName: spec?.name || "Skatītājs",
-      last3: last3Public
+      last3: last3Public,
+      gameHistory
     });
   }
 }
@@ -480,9 +490,12 @@ function finalizeGame(roomId, reason){
   stopTurnTimer(room);
   room.draft=null;
 
-  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason };
+  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason, deductions: [] };
+  room.gameHistory = [
+    { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason }
+  ].concat(room.gameHistory || []).slice(0,5);
 
-  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, final, durationMs, reason });
+  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, final, durationMs, reason, deductions: [] });
   emitState(roomId);
   emitRoomsList();
 }
@@ -504,9 +517,15 @@ function endByEmptyRack(roomId, winnerId){
   if(!winner) return;
 
   let transfer=0;
+  const deductions = [];
   for(const [id,p] of room.players.entries()){
     if(id===winnerId) continue;
-    transfer += (p.rack||[]).reduce((s,t)=>s+(t.pts||0),0);
+    const penalty = (p.rack||[]).reduce((s,t)=>s+(t.pts||0),0);
+    transfer += penalty;
+    if(penalty){
+      p.score -= penalty;
+    }
+    deductions.push({ name: p.name, points: penalty });
   }
   winner.score += transfer;
 
@@ -522,9 +541,12 @@ function endByEmptyRack(roomId, winnerId){
   stopTurnTimer(room);
   room.draft=null;
 
-  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, transfer, final, at: Date.now(), durationMs, reason:"Beidzās kauliņi" };
+  room.lastGameOver = { winnerName: winner.name, winnerScore: winner.score, transfer, final, at: Date.now(), durationMs, reason:"Beidzās kauliņi", deductions };
+  room.gameHistory = [
+    { winnerName: winner.name, winnerScore: winner.score, final, at: Date.now(), durationMs, reason:"Beidzās kauliņi", deductions }
+  ].concat(room.gameHistory || []).slice(0,5);
 
-  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, transfer, final, durationMs, reason:"Beidzās kauliņi" });
+  io.to(roomId).emit("effect",{ type:"gameOver", winnerName:winner.name, winnerScore:winner.score, transfer, final, durationMs, reason:"Beidzās kauliņi", deductions });
   emitState(roomId);
   emitRoomsList();
 }
@@ -543,6 +565,25 @@ function removePlayerFromTurnOrder(room, pid){
     if(room.turnIndex>=room.turnOrder.length) room.turnIndex=0;
     if(idx<room.turnIndex) room.turnIndex=Math.max(0,room.turnIndex-1);
   }
+}
+
+function triggerBotTurn(roomId){
+  const room = rooms.get(roomId);
+  if(!room || !room.started) return;
+  const botId = makeBotId(roomId);
+  if(!room.players.has(botId)) return;
+  if(currentTurnId(room) !== botId) return;
+  if(room.botThinking) return;
+
+  room.botThinking = true;
+  setTimeout(async ()=>{
+    try{
+      await botTakeTurn(roomId);
+    }finally{
+      const liveRoom = rooms.get(roomId);
+      if(liveRoom) liveRoom.botThinking = false;
+    }
+  }, 450);
 }
 
 /* -------------------- Tezaurs (NEBLOĶĒ gājienu) -------------------- */
@@ -954,11 +995,25 @@ async function botTakeTurn(roomId){
 
   // filtrējam ar verifyWordStrict (stingri)
   const okWords = [];
+  const fallbackWords = [];
+  let tezaursDown = false;
   for(const w of candidates){
     const check = await verifyWordStrict(w);
-    if(check.ok) okWords.push(w);
+    if(check.ok){
+      okWords.push(w);
+    }else{
+      const reason = String(check.reason || "");
+      if(reason.toLowerCase().includes("tezaurs")){
+        fallbackWords.push(w);
+        tezaursDown = true;
+        break;
+      }
+    }
     if(okWords.length>=60) break;
   }
+  const usableWords = okWords.length
+    ? okWords
+    : (tezaursDown ? candidates.slice(0, 60) : fallbackWords.slice(0, 60));
 
   let best = null;
 
@@ -966,7 +1021,7 @@ async function botTakeTurn(roomId){
 
   if(empty){
     // pirmais vārds caur centru horizontāli
-    for(const w of okWords){
+    for(const w of usableWords){
       // lai iet caur (7,7): izvēlamies startX tā, lai kāds burts iekrīt centrā
       for(let i=0;i<w.length;i++){
         const startX = 7 - i;
@@ -983,7 +1038,7 @@ async function botTakeTurn(roomId){
         if(!fixed) continue;
         const fixedCh = String(fixed.ch||"").toLowerCase();
 
-        for(const w of okWords){
+        for(const w of usableWords){
           for(let i=0;i<w.length;i++){
             if(w[i] !== fixedCh) continue;
 
@@ -1029,7 +1084,7 @@ async function botTakeTurn(roomId){
   bot.score += best.score;
 
   // “accepted” efekts (lai redz animāciju)
-  io.to(roomId).emit("effect",{type:"accepted", by:botId, byName:bot.name, total:best.score, words:best.words, hits:[]});
+  io.to(roomId).emit("effect",{type:"accepted", by:botId, byName:bot.name, total:best.score, words:best.words, hits:[], placements: best.placements.map(p=>({x:p.x,y:p.y}))});
 
   // validateAndScoreMove jau pārbaudīja, tagad jāpielieto placements
   // lai nav dubulta parse, uztaisām placementsMap atkārtoti, izmantojot validateAndScoreMove vēlreiz (droši)
@@ -1368,7 +1423,7 @@ socket.on("setTurnTime",({roomId,sec})=>{
     }
     room.last3 = room.last3.slice(0,3);
 
-    io.to(roomId).emit("effect",{type:"accepted", by:socket.id, byName:player.name, total:res.total, words:res.words, hits});
+    io.to(roomId).emit("effect",{type:"accepted", by:socket.id, byName:player.name, total:res.total, words:res.words, hits, placements: res.placements.map(p=>({x:p.x,y:p.y}))});
 
     if((player.rack?.length||0)===0) return endByEmptyRack(roomId, socket.id);
 
