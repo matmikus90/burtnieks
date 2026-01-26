@@ -583,7 +583,7 @@ function triggerBotTurn(roomId){
       const liveRoom = rooms.get(roomId);
       if(liveRoom) liveRoom.botThinking = false;
     }
-  }, 450);
+  }, 200);
 }
 
 /* -------------------- Tezaurs (NEBLOĶĒ gājienu) -------------------- */
@@ -1016,6 +1016,48 @@ function tryPlaceWordAt(room, botId, word, startX, startY, dx, dy){
   return { placements, score: res.total, words: res.words };
 }
 
+async function tryBotWord(room, botId, word){
+  const empty = isBoardEmpty(room);
+  let best = null;
+
+  if(empty){
+    for(let i=0;i<word.length;i++){
+      const startX = 7 - i;
+      const startY = 7;
+      const move = tryPlaceWordAt(room, botId, word, startX, startY, 1, 0);
+      if(move && (!best || move.score > best.score)) best = { ...move, word };
+    }
+  }else{
+    for(let y=0;y<15;y++){
+      for(let x=0;x<15;x++){
+        const fixed = room.board[y][x];
+        if(!fixed) continue;
+        const fixedCh = String(fixed.ch||"").toLowerCase();
+        for(let i=0;i<word.length;i++){
+          if(word[i] !== fixedCh) continue;
+          let startX = x - i, startY = y;
+          let mv1 = tryPlaceWordAt(room, botId, word, startX, startY, 1, 0);
+          if(mv1 && (!best || mv1.score > best.score)) best = { ...mv1, word };
+          startX = x; startY = y - i;
+          let mv2 = tryPlaceWordAt(room, botId, word, startX, startY, 0, 1);
+          if(mv2 && (!best || mv2.score > best.score)) best = { ...mv2, word };
+        }
+      }
+    }
+  }
+
+  if(!best) return null;
+  const madeStrict = [...new Set((best.words||[])
+    .map(w=>String(w.word||"").toLowerCase())
+    .filter(w=>w && w!=="bonus")
+  )];
+  for(const w of madeStrict){
+    const check = await verifyWordStrict(w);
+    if(!check.ok) return null;
+  }
+  return best;
+}
+
 async function botTakeTurn(roomId){
   const room = rooms.get(roomId);
   if(!room || !room.started) return;
@@ -1068,45 +1110,9 @@ async function botTakeTurn(roomId){
     : (tezaursDown ? candidates.slice(0, 60) : fallbackWords.slice(0, 60));
 
   let best = null;
-
-  const empty = isBoardEmpty(room);
-
-  if(empty){
-    // pirmais vārds caur centru horizontāli
-    for(const w of usableWords){
-      // lai iet caur (7,7): izvēlamies startX tā, lai kāds burts iekrīt centrā
-      for(let i=0;i<w.length;i++){
-        const startX = 7 - i;
-        const startY = 7;
-        const move = tryPlaceWordAt(room, botId, w, startX, startY, 1, 0);
-        if(move && (!best || move.score > best.score)) best = { ...move, word:w };
-      }
-    }
-  }else{
-    // meklējam krustošanu ar esošajiem burtiem: pārskrienam pa laukumu un mēģinam krustot
-    for(let y=0;y<15;y++){
-      for(let x=0;x<15;x++){
-        const fixed = room.board[y][x];
-        if(!fixed) continue;
-        const fixedCh = String(fixed.ch||"").toLowerCase();
-
-        for(const w of usableWords){
-          for(let i=0;i<w.length;i++){
-            if(w[i] !== fixedCh) continue;
-
-            // horizontāli (krustojot)
-            let startX = x - i, startY = y;
-            let mv1 = tryPlaceWordAt(room, botId, w, startX, startY, 1, 0);
-            if(mv1 && (!best || mv1.score > best.score)) best = { ...mv1, word:w };
-
-            // vertikāli
-            startX = x; startY = y - i;
-            let mv2 = tryPlaceWordAt(room, botId, w, startX, startY, 0, 1);
-            if(mv2 && (!best || mv2.score > best.score)) best = { ...mv2, word:w };
-          }
-        }
-      }
-    }
+  for(const w of usableWords){
+    const attempt = await tryBotWord(room, botId, w);
+    if(attempt && (!best || attempt.score > best.score)) best = attempt;
   }
 
   if(!best){
@@ -1144,6 +1150,25 @@ async function botTakeTurn(roomId){
   if(res2.ok){
     applyMove(room, botId, res2.placements, res2.placementsMap);
   }
+
+  const made = [...new Set((best.words||[]).map(w=>String(w.word||"").toLowerCase()).filter(w=>w && w!=="bonus"))];
+  for(const w of made){
+    const strict = await verifyWordStrict(w);
+    if(!strict.ok) continue;
+    const info = await infoFromTezaurs(w);
+    const m = (strict.morph || info.morph || {});
+    room.last3.unshift({
+      word: w,
+      tezaursId: (strict.tezaursId || info.tezaursId || (w+":1")),
+      lemma: (strict.lemma || info.lemma || w),
+      meaning: info.meaning || "",
+      morph: m,
+      summary: info.summary || "",
+      byName: bot.name,
+      ts: Date.now()
+    });
+  }
+  room.last3 = room.last3.slice(0,3);
 
   bot.rack = bot.rack || [];
   room.passStreak.set(botId, 0);
