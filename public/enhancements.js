@@ -6,6 +6,8 @@
   let soundEnabled = localStorage.getItem('burtnieks:sound') !== 'off';
   let previousTurnId = window.__burtnieksState?.turnId || null;
   let previousChatLength = window.__burtnieksState?.chat?.length || 0;
+  let startOverlayTimer = null;
+  let suppressTurnSoundUntil = 0;
 
   function ensureAudio() {
     if (!soundEnabled) return null;
@@ -39,6 +41,7 @@
     const sounds = {
       move: [{ frequency: 660 }, { frequency: 880 }],
       turn: [{ frequency: 523 }, { frequency: 784, duration: 0.16 }],
+      draw: [{ frequency: 392 }, { frequency: 523 }, { frequency: 659, duration: 0.18 }],
       chat: [{ frequency: 820, duration: 0.08 }],
       pass: [{ frequency: 330, duration: 0.11 }],
       error: [{ frequency: 220, duration: 0.14, type: 'square', amplitude: 0.035 }],
@@ -67,9 +70,73 @@
   }
   document.addEventListener('pointerdown', ensureAudio, { once: true, passive: true });
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+  }
+
+  function removeStartOverlay() {
+    clearTimeout(startOverlayTimer);
+    document.getElementById('sessionStartOverlay')?.remove();
+  }
+
+  function openStartOverlay(innerHtml, durationMs) {
+    removeStartOverlay();
+    document.getElementById('gameOver')?.classList.add('hidden');
+    const overlay = document.createElement('div');
+    overlay.id = 'sessionStartOverlay';
+    overlay.className = 'start-order-overlay';
+    overlay.innerHTML = `<section class="start-order-card">${innerHtml}</section>`;
+    document.body.appendChild(overlay);
+    startOverlayTimer = setTimeout(removeStartOverlay, durationMs);
+    return overlay;
+  }
+
+  function showLetterDraw(effect) {
+    const order = Array.isArray(effect.order) ? effect.order : [];
+    const title = effect.rematchFallback ? 'Neizšķirts — jauna izloze' : 'Pirmā gājiena izloze';
+    const overlay = openStartOverlay(`
+      <div class="start-order-kicker">Spēles sākums</div>
+      <h2>${title}</h2>
+      <p>Katrs spēlētājs izvelk burtu. Latviešu alfabētā agrākais burts sāk partiju.</p>
+      <div class="draw-list">
+        ${order.map((player, index) => `<div class="draw-row${index === 0 ? ' starter' : ''}" data-player-id="${escapeHtml(player.id)}"><span class="draw-position">${index + 1}.</span><b>${escapeHtml(player.name)}</b><span class="draw-letter">?</span><span class="draw-start-label">${index === 0 ? 'SĀK' : ''}</span></div>`).join('')}
+      </div>
+    `, Math.max(4200, 1300 + order.length * 500));
+
+    suppressTurnSoundUntil = Date.now() + Math.max(3200, order.length * 500);
+    playSound('draw');
+    const rows = overlay.querySelectorAll('.draw-row');
+    order.forEach((player, index) => {
+      setTimeout(() => {
+        const row = rows[index];
+        if (!row) return;
+        const letter = effect.draws?.[player.id]?.ch || '_';
+        row.querySelector('.draw-letter').textContent = String(letter).toUpperCase();
+        row.classList.add('revealed');
+      }, 450 + index * 480);
+    });
+  }
+
+  function showWinnerStarts(effect) {
+    const order = Array.isArray(effect.order) ? effect.order : [];
+    openStartOverlay(`
+      <div class="start-order-kicker">Atkārtotā partija</div>
+      <h2>Uzvarētājs sāk</h2>
+      <div class="winner-start-name">🏆 ${escapeHtml(effect.starterName || 'Uzvarētājs')}</div>
+      <p>Iepriekšējās partijas uzvarētājs veic pirmo gājienu.</p>
+      <div class="compact-order">Secība: ${order.map((player, index) => `<span class="${index === 0 ? 'first' : ''}">${index + 1}. ${escapeHtml(player.name)}</span>`).join(' · ')}</div>
+    `, 3000);
+    suppressTurnSoundUntil = Date.now() + 2400;
+    playSound('turn');
+  }
+
   socket.on('effect', (effect) => {
     if (effect.type === 'accepted') playSound('move');
     else if (['passed', 'timeout', 'exchanged'].includes(effect.type)) playSound('pass');
+    else if (effect.type === 'letterDraw') showLetterDraw(effect);
+    else if (effect.type === 'winnerStarts') showWinnerStarts(effect);
     else if (effect.type === 'gameOver') playSound('gameOver');
   });
 
@@ -79,7 +146,7 @@
     const chatLength = state.chat?.length || 0;
     const newest = state.chat?.[chatLength - 1];
     const myName = state.players?.find((player) => player.id === state.meId)?.name || '';
-    if (becameMyTurn) playSound('turn');
+    if (becameMyTurn && Date.now() > suppressTurnSoundUntil) playSound('turn');
     if (chatLength > previousChatLength && newest && newest.name !== myName) playSound('chat');
     previousTurnId = state.turnId; previousChatLength = chatLength;
   });
