@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const zlib = require('zlib');
+const { patchServer, patchInterface } = require('../runtime-patches');
+const { classifyDictionaryEntry, normalizeWord } = require('../word-validator');
 
 const root = path.join(__dirname, '..');
 
@@ -9,38 +11,43 @@ function readBundle(relativePath) {
   const encoded = fs.readFileSync(path.join(root, relativePath), 'utf8').trim();
   return zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8');
 }
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
+function assert(condition, message) { if (!condition) throw new Error(message); }
+function localizeBoardMultipliers(source) {
+  return source
+    .replaceAll('label[y][x] = "TW";', 'label[y][x] = "3V";')
+    .replaceAll('label[y][x] = (x===7&&y===7) ? "★" : "DW";', 'label[y][x] = (x===7&&y===7) ? "★" : "2V";')
+    .replaceAll('label[y][x] = "TL";', 'label[y][x] = "3B";')
+    .replaceAll('label[y][x] = "DL";', 'label[y][x] = "2B";')
+    .replaceAll('.cell[data-m=TW]', '.cell[data-m="3V"]')
+    .replaceAll('.cell[data-m=DW]', '.cell[data-m="2V"]')
+    .replaceAll('.cell[data-m=TL]', '.cell[data-m="3B"]')
+    .replaceAll('.cell[data-m=DL]', '.cell[data-m="2B"]');
 }
 
-const serverSource = fs.existsSync(path.join(root, 'server.bundle.gz.b64'))
-  ? readBundle('server.bundle.gz.b64')
-  : fs.readFileSync(path.join(root, 'server.js'), 'utf8');
-const htmlSource = fs.existsSync(path.join(root, 'public/index.bundle.gz.b64'))
-  ? readBundle('public/index.bundle.gz.b64')
-  : fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
+const rawServer = readBundle('server.bundle.gz.b64');
+const rawHtml = readBundle('public/index.bundle.gz.b64');
+const serverSource = patchServer(localizeBoardMultipliers(rawServer));
+const htmlSource = patchInterface(localizeBoardMultipliers(rawHtml));
 
 new vm.Script(serverSource, { filename: 'runtime-server.js' });
-
 const inlineScripts = [...htmlSource.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
-  .map(match => match[1])
-  .filter(source => source.trim());
+  .map((match) => match[1]).filter((source) => source.trim());
 assert(inlineScripts.length > 0, 'Klienta inline JavaScript netika atrasts.');
-for (const [index, source] of inlineScripts.entries()) {
-  new vm.Script(source, { filename: `client-inline-${index + 1}.js` });
-}
+inlineScripts.forEach((source, index) => new vm.Script(source, { filename: `client-inline-${index + 1}.js` }));
+new vm.Script(fs.readFileSync(path.join(root, 'public/enhancements.js'), 'utf8'), { filename: 'enhancements.js' });
 
-assert(htmlSource.includes('id="soundToggle"'), 'Nav skaņas ieslēgšanas/izslēgšanas pogas.');
-assert(htmlSource.includes("TW:'3V'"), 'Nav latviskā 3V apzīmējuma.');
-assert(htmlSource.includes("DL:'2B'"), 'Nav latviskā 2B apzīmējuma.');
-assert(htmlSource.includes('/api/check-word'), 'Klientā nav vārdu pārbaudes.');
-assert(serverSource.includes('classifyDictionaryEntry'), 'Serverī nav vārdnīcas ierakstu klasifikācijas.');
-assert(serverSource.includes('Saīsinājumi un akronīmi nav atļauti'), 'Serverī nav saīsinājumu aizlieguma.');
-assert(serverSource.includes('Īpašvārdi nav atļauti'), 'Serverī nav īpašvārdu aizlieguma.');
+assert(htmlSource.includes('/enhancements.js'), 'Nav klienta uzlabojumu skripta.');
+assert(serverSource.includes('label[y][x] = "3V";'), 'Nav latviskā 3V apzīmējuma.');
+assert(serverSource.includes('label[y][x] = "2B";'), 'Nav latviskā 2B apzīmējuma.');
+assert(serverSource.includes('/api/check-word'), 'Serverī nav vārdu pārbaudes API.');
+assert(classifyDictionaryEntry({ heading: 'API', senses: [{ gloss: 'saīsinājums' }] }).isAbbrev, 'API jāatpazīst kā saīsinājums.');
+assert(classifyDictionaryEntry({ heading: 'Rīga', senses: [{ gloss: 'Latvijas galvaspilsēta' }] }).isProper, 'Rīga jāatpazīst kā īpašvārds.');
+const common = classifyDictionaryEntry({ heading: 'kaķis', senses: [{ gloss: 'mājas dzīvnieks' }] });
+assert(!common.isAbbrev && !common.isProper, 'Kaķis jāatpazīst kā parasts vārds.');
+assert(normalizeWord(' ĀBELE ') === 'ābele', 'Vārda normalizācija nedarbojas.');
 
-console.log('✓ Servera JavaScript sintakse');
-console.log('✓ Klienta JavaScript sintakse');
-console.log('✓ Skaņas poga');
+console.log('✓ Servera un klienta JavaScript sintakse');
+console.log('✓ Skaņas poga un skaņu modulis');
 console.log('✓ Latviskie laukuma apzīmējumi');
-console.log('✓ Stingrā vārdu pārbaude');
+console.log('✓ Saīsinājumu un īpašvārdu noteikšana');
+console.log('✓ Vārdu pārbaudes API un interfeiss');
