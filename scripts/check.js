@@ -28,18 +28,25 @@ const rawServer = readBundle('server.bundle.gz.b64');
 const rawHtml = readBundle('public/index.bundle.gz.b64');
 const serverSource = patchServer(localizeBoardMultipliers(rawServer));
 const htmlSource = patchInterface(localizeBoardMultipliers(rawHtml));
+const enhancementsSource = fs.readFileSync(path.join(root, 'public/enhancements.js'), 'utf8');
 
 new vm.Script(serverSource, { filename: 'runtime-server.js' });
 const inlineScripts = [...htmlSource.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
   .map((match) => match[1]).filter((source) => source.trim());
 assert(inlineScripts.length > 0, 'Klienta inline JavaScript netika atrasts.');
 inlineScripts.forEach((source, index) => new vm.Script(source, { filename: `client-inline-${index + 1}.js` }));
-new vm.Script(fs.readFileSync(path.join(root, 'public/enhancements.js'), 'utf8'), { filename: 'enhancements.js' });
+new vm.Script(enhancementsSource, { filename: 'enhancements.js' });
 
 assert(htmlSource.includes('/enhancements.js'), 'Nav klienta uzlabojumu skripta.');
 assert(serverSource.includes('label[y][x] = "3V";'), 'Nav latviskā 3V apzīmējuma.');
 assert(serverSource.includes('label[y][x] = "2B";'), 'Nav latviskā 2B apzīmējuma.');
 assert(serverSource.includes('/api/check-word'), 'Serverī nav vārdu pārbaudes API.');
+assert(serverSource.includes('type:"letterDraw"'), 'Pirmajā partijā nav burtu izlozes.');
+assert(serverSource.includes('type:"winnerStarts"'), 'Atkārtotajā partijā nav uzvarētāja sākuma notikuma.');
+assert(serverSource.includes('startGame(roomId, { rematch:true })'), 'Atkārtotā spēle neizmanto uzvarētāja sākuma secību.');
+assert(serverSource.includes('previousWinnerId'), 'Netiek saglabāts iepriekšējās partijas uzvarētājs.');
+assert(enhancementsSource.includes('Pirmā gājiena izloze'), 'Klientā nav burtu izlozes animācijas.');
+assert(enhancementsSource.includes('Uzvarētājs sāk'), 'Klientā nav atkārtotās partijas sākuma paziņojuma.');
 assert(classifyDictionaryEntry({ heading: 'API', senses: [{ gloss: 'saīsinājums' }] }).isAbbrev, 'API jāatpazīst kā saīsinājums.');
 assert(classifyDictionaryEntry({ heading: 'Rīga', senses: [{ gloss: 'Latvijas galvaspilsēta' }] }).isProper, 'Rīga jāatpazīst kā īpašvārds.');
 const common = classifyDictionaryEntry({ heading: 'kaķis', senses: [{ gloss: 'mājas dzīvnieks' }] });
@@ -49,5 +56,7 @@ assert(normalizeWord(' ĀBELE ') === 'ābele', 'Vārda normalizācija nedarbojas
 console.log('✓ Servera un klienta JavaScript sintakse');
 console.log('✓ Skaņas poga un skaņu modulis');
 console.log('✓ Latviskie laukuma apzīmējumi');
+console.log('✓ Pirmās partijas burtu izloze');
+console.log('✓ Atkārtotajā partijā sāk iepriekšējais uzvarētājs');
 console.log('✓ Saīsinājumu un īpašvārdu noteikšana');
 console.log('✓ Vārdu pārbaudes API un interfeiss');
