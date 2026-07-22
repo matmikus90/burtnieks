@@ -1,12 +1,12 @@
 {
   "name": "burtnieks",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "check": "node --check server.js"
+    "check": "node scripts/check.js"
   },
   "dependencies": {
     "express": "^5.2.1",
