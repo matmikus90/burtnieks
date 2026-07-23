@@ -42,6 +42,7 @@ for (const marker of [
 assert(serverSource.includes('isHumanWordVoter'), 'Datora spēlētājs nedrīkst būt balsotājs.');
 assert(serverSource.includes('rejectWordVote(roomId,room,vote'), 'Viena noraidoša balss neaptur balsojumu.');
 assert(serverSource.includes('stopTurnTimer(room)'), 'Balsošanas laikā netiek apturēts taimeris.');
+assert(serverSource.includes('if(room.pendingWordVote) return io.to(socket.id).emit("toast","Vispirms pabeidziet vārda balsošanu.");\n    const pid=socket.id;'), 'Tukšā kauliņa maiņa nav bloķēta balsošanas laikā.');
 assert(serverSource.includes('if(room.pendingWordVote) return;\n  scheduleBotTurn(roomId);'), 'Bots nav apturēts balsošanas laikā.');
 
 const htmlSource = patchWordVoteInterface(patchAchievementInterface(patchInterface(localize(readBundle('public/index.bundle.gz.b64')))));
