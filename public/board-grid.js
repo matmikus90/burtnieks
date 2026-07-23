@@ -3,7 +3,7 @@
   window.__burtnieksBoardGridReady = true;
 
   const TRACKS = 15;
-  const DESKTOP_MAX_BOARD = 780;
+  const DESKTOP_MAX_BOARD = 840;
   const TABLET_MAX_BOARD = 720;
   const MIN_BOARD = 300;
   let frame = 0;
@@ -24,12 +24,12 @@
 
   function targetBoardSize(board) {
     const availableWidth = contentWidth(board.parentElement);
-    const viewportHeight = window.visualViewport?.height || window.innerHeight || availableWidth;
     const desktop = window.matchMedia('(min-width:1051px)').matches;
-    const maxBoard = desktop ? DESKTOP_MAX_BOARD : TABLET_MAX_BOARD;
-    const verticalReserve = desktop ? 120 : 90;
-    const availableHeight = Math.max(MIN_BOARD, viewportHeight - verticalReserve);
-    return Math.min(availableWidth, availableHeight, maxBoard);
+    if (desktop) return Math.min(availableWidth, DESKTOP_MAX_BOARD);
+
+    const viewportHeight = window.visualViewport?.height || window.innerHeight || availableWidth;
+    const availableHeight = Math.max(MIN_BOARD, viewportHeight - 90);
+    return Math.min(availableWidth, availableHeight, TABLET_MAX_BOARD);
   }
 
   function observeContainer(board) {
