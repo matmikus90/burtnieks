@@ -72,28 +72,30 @@ function patchFinalScoringInterface(source) {
   const end = source.indexOf("\n  $('chatToggle').onclick", start);
   if (start === -1 || end === -1) throw new Error('Neizdevās atrast partijas beigu loga renderēšanu.');
 
-  const replacement = `function showGameOver(e){
-    $('gameOver').classList.remove('hidden');
-    $('winner').textContent=\`${e.winnerName||'—'} · ${e.winnerScore||0} p.\`;
-    const finisherNote=e.reason==='Beidzās kauliņi'&&e.finisherName
-      ? \` · Visus kauliņus izlika ${e.finisherName} (+${e.transfer||0} p.)\`
-      : '';
-    $('gameOverReason').textContent=\`Istaba: ${state?.roomName||state?.roomId||'—'} · ${e.reason||'Partija pabeigta'}${finisherNote} · laiks ${fmt(e.durationMs||0)}\`;
-    const adjustments=new Map((e.adjustments||[]).map(item=>[String(item.id||item.name),item]));
-    $('finalList').innerHTML=(e.final||[]).map((p,i)=>{
-      const adjustment=adjustments.get(String(p.id||p.name));
-      let details='';
-      if(adjustment){
-        const sign=adjustment.adjustment>0?'+':'';
-        details=adjustment.isFinisher
-          ? \`<div class="final-adjustment gain">Pirms: ${adjustment.beforeScore} p. · Saņemts no pārējiem: +${adjustment.adjustment} p. · Gala rezultāts: ${adjustment.afterScore} p.</div>\`
-          : \`<div class="final-adjustment loss">Pirms: ${adjustment.beforeScore} p. · Plauktā palika: ${adjustment.remainingPoints} p. · Korekcija: ${sign}${adjustment.adjustment} p. · Gala rezultāts: ${adjustment.afterScore} p.</div>\`;
-      }
-      return \`<div class="final-row final-row-detailed"><div><b>${i+1}. ${esc(p.name)}</b>${adjustment?.isFinisher?'<span class="finisher-badge">Izlika visus kauliņus</span>':''}${details}</div><span class="final-score">${p.score} p.</span></div>\`;
-    }).join('');
-    $('rematch').disabled=(state?.rematchVotes||[]).includes(state?.meId);
-    $('rematchStatus').textContent=$('rematch').disabled?'Tu jau izvēlējies atkārtotu spēli.':'';
-  }`;
+  const replacement = [
+    "function showGameOver(e){",
+    "    $('gameOver').classList.remove('hidden');",
+    "    $('winner').textContent=`${e.winnerName||'—'} · ${e.winnerScore||0} p.`;",
+    "    const finisherNote=e.reason==='Beidzās kauliņi'&&e.finisherName",
+    "      ? ` · Visus kauliņus izlika ${e.finisherName} (+${e.transfer||0} p.)`",
+    "      : '';",
+    "    $('gameOverReason').textContent=`Istaba: ${state?.roomName||state?.roomId||'—'} · ${e.reason||'Partija pabeigta'}${finisherNote} · laiks ${fmt(e.durationMs||0)}`;",
+    "    const adjustments=new Map((e.adjustments||[]).map(item=>[String(item.id||item.name),item]));",
+    "    $('finalList').innerHTML=(e.final||[]).map((p,i)=>{",
+    "      const adjustment=adjustments.get(String(p.id||p.name));",
+    "      let details='';",
+    "      if(adjustment){",
+    "        const sign=adjustment.adjustment>0?'+':'';",
+    "        details=adjustment.isFinisher",
+    "          ? `<div class=\"final-adjustment gain\">Pirms: ${adjustment.beforeScore} p. · Saņemts no pārējiem: +${adjustment.adjustment} p. · Gala rezultāts: ${adjustment.afterScore} p.</div>`",
+    "          : `<div class=\"final-adjustment loss\">Pirms: ${adjustment.beforeScore} p. · Plauktā palika: ${adjustment.remainingPoints} p. · Korekcija: ${sign}${adjustment.adjustment} p. · Gala rezultāts: ${adjustment.afterScore} p.</div>`;",
+    "      }",
+    "      return `<div class=\"final-row final-row-detailed\"><div><b>${i+1}. ${esc(p.name)}</b>${adjustment?.isFinisher?'<span class=\"finisher-badge\">Izlika visus kauliņus</span>':''}${details}</div><span class=\"final-score\">${p.score} p.</span></div>`;",
+    "    }).join('');",
+    "    $('rematch').disabled=(state?.rematchVotes||[]).includes(state?.meId);",
+    "    $('rematchStatus').textContent=$('rematch').disabled?'Tu jau izvēlējies atkārtotu spēli.':'';",
+    "  }",
+  ].join('\n');
 
   return source.slice(0, start) + replacement + source.slice(end);
 }
