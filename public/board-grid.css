@@ -10,6 +10,8 @@
   width:var(--board-size,max-content);
   height:var(--board-size,auto);
   min-width:var(--board-size,max-content);
+  max-width:100%;
+  margin-inline:auto;
   align-content:start;
   justify-content:start;
   overflow:hidden;
@@ -30,6 +32,11 @@
 #board.board>.cell>.tile{
   max-width:calc(var(--board-cell) - 7px);
   max-height:calc(var(--board-cell) - 7px);
+}
+
+@media(min-width:1051px){
+  #board.board{border-radius:12px}
+  #board.board>.cell{border-radius:4px}
 }
 
 @media(max-width:720px){
