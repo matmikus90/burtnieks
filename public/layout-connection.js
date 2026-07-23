@@ -21,7 +21,18 @@
       statusPanel.classList.add('game-status-panel');
       strip.appendChild(statusPanel);
     }
-    if (lobbyPanel) strip.appendChild(lobbyPanel);
+    if (lobbyPanel) {
+      strip.appendChild(lobbyPanel);
+
+      const sectionTitle = lobbyPanel.querySelector(':scope > .section-title');
+      if (sectionTitle) sectionTitle.textContent = 'Istabas iestatījumi';
+
+      const actionRow = lobbyPanel.querySelector(':scope > .row');
+      const readyButton = document.getElementById('ready');
+      if (actionRow && readyButton && readyButton.parentElement !== actionRow) {
+        actionRow.appendChild(readyButton);
+      }
+    }
 
     window.dispatchEvent(new Event('resize'));
   }
