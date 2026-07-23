@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 const { patchServer, patchInterface } = require("./runtime-patches");
+const { patchAchievementServer, patchAchievementInterface } = require("./achievement-patches");
 
 function materializeBundle(bundlePath, targetPath, transform = (source) => source) {
   const encoded = fs.readFileSync(bundlePath, "utf8").trim();
@@ -31,7 +32,15 @@ function localizeBoardMultipliers(source) {
 const runtimeServer = path.join(__dirname, ".runtime-server.js");
 const runtimeInterface = path.join(__dirname, "public", "app.html");
 
-materializeBundle(path.join(__dirname, "server.bundle.gz.b64"), runtimeServer, (source) => patchServer(localizeBoardMultipliers(source)));
-materializeBundle(path.join(__dirname, "public", "index.bundle.gz.b64"), runtimeInterface, (source) => patchInterface(localizeBoardMultipliers(source)));
+materializeBundle(
+  path.join(__dirname, "server.bundle.gz.b64"),
+  runtimeServer,
+  (source) => patchAchievementServer(patchServer(localizeBoardMultipliers(source)))
+);
+materializeBundle(
+  path.join(__dirname, "public", "index.bundle.gz.b64"),
+  runtimeInterface,
+  (source) => patchAchievementInterface(patchInterface(localizeBoardMultipliers(source)))
+);
 
 require(runtimeServer);
