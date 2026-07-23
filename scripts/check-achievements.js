@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
 const { patchAchievementServer, patchAchievementInterface } = require('../achievement-patches');
 const { evaluateMoveAchievements, unlockMoveAchievements } = require('../achievements');
@@ -36,6 +34,7 @@ const io={to(){return{emit(){}}}};
 const { createWordValidator } = require("./word-validator");
 const { verifyWordStrict } = createWordValidator({ httpGet });
 function makeRoom(){return{
+    chat: [],
     rematchVotes: new Set(),
     mult:{label:[]}
 }}
@@ -50,18 +49,21 @@ function bot(){
 }
 `;
 const patchedServer = patchAchievementServer(fixture);
-assert(patchedServer.includes('type:"achievements"'), 'Servera ielāpā nav sasniegumu efekta.');
+assert(patchedServer.includes('name:"🧙 Sasniegums"'), 'Servera ielāpā nav sasnieguma čata ziņas.');
+assert(patchedServer.includes('room.chat.push'), 'Sasniegums netiek pievienots čatam.');
+assert(!patchedServer.includes('type:"achievements"'), 'Vecais uznirstošā loga efekts joprojām ir pieslēgts.');
 assert(patchedServer.includes('achievementUnlocked: new Map()'), 'Istabai nav sasniegumu stāvokļa.');
-assert(patchedServer.includes('emitMoveAchievements(roomId,room,socket.id'), 'Cilvēka gājiens nav pieslēgts sasniegumiem.');
-assert(patchedServer.includes('emitMoveAchievements(roomId,current,botId'), 'Datora gājiens nav pieslēgts sasniegumiem.');
+assert(patchedServer.includes('appendMoveAchievementsToChat(room,socket.id'), 'Cilvēka gājiens nav pieslēgts sasniegumu čatam.');
+assert(patchedServer.includes('appendMoveAchievementsToChat(current,botId'), 'Datora gājiens nav pieslēgts sasniegumu čatam.');
 new vm.Script(patchedServer, { filename: 'achievement-server-fixture.js' });
 
-const patchedHtml = patchAchievementInterface('<!doctype html><html><head></head><body></body></html>');
-assert(patchedHtml.includes('/achievements.css'), 'Interfeisā nav sasniegumu stilu.');
-assert(patchedHtml.includes('/achievements-ui.js'), 'Interfeisā nav sasniegumu skripta.');
-new vm.Script(fs.readFileSync(path.join(__dirname, '..', 'public', 'achievements-ui.js'), 'utf8'), { filename: 'achievements-ui.js' });
+const chatMarker = '<div class="chat-msg"><b>${esc(m.name)}</b> ${esc(m.msg)}</div>';
+const patchedHtml = patchAchievementInterface(`<!doctype html><html><head><link rel="stylesheet" href="/achievements.css">\n</head><body><script>const row=\`${chatMarker}\`;</script><script src="/achievements-ui.js"></script>\n</body></html>`);
+assert(patchedHtml.includes('achievement-chat'), 'Sasnieguma čata ziņai nav īpašā noformējuma.');
+assert(!patchedHtml.includes('/achievements.css'), 'Vecie uznirstošā loga stili joprojām tiek ielādēti.');
+assert(!patchedHtml.includes('/achievements-ui.js'), 'Vecais uznirstošā loga skripts joprojām tiek ielādēts.');
 
 console.log('✓ Sasniegumu noteikumi');
 console.log('✓ Sasniegumi neatkārtojas vienā istabas sesijā');
-console.log('✓ Cilvēka un datora gājiena sasniegumu pieslēgums');
-console.log('✓ Dejojošā burtu burvja interfeiss');
+console.log('✓ Cilvēka un datora sasniegumi tiek ierakstīti čatā');
+console.log('✓ Uznirstošais sasniegumu logs ir noņemts');
