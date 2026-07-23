@@ -71,11 +71,18 @@ const layoutCss = fs.readFileSync(path.join(root, 'public', 'layout-connection.c
 new vm.Script(layoutJs, { filename: 'layout-connection.js' });
 assert(layoutJs.includes('game-top-strip'), 'Lobija paneļi netiek pārvietoti augšā.');
 assert(layoutJs.includes("fetch('/healthz'"), 'Klients nediagnosticē servera sasniedzamību.');
+assert(layoutJs.includes('actionRow.appendChild(readyButton)'), 'Gatavības poga netiek pārvietota kopējā darbību rindā.');
+assert(layoutJs.includes("sectionTitle.textContent = 'Istabas iestatījumi'"), 'Istabas iestatījumu virsraksts nav sakārtots.');
 assert(layoutCss.includes('grid-template-columns:minmax(0,1fr) minmax(285px,325px)'), 'Sānu kolonna nav sašaurināta.');
+assert(layoutCss.includes('grid-template-columns:repeat(2,minmax(0,1fr))'), 'Augšējie paneļi nav simetriskās kolonnās.');
+assert(layoutCss.includes('grid-template-columns:repeat(3,minmax(0,1fr))'), 'Lobija darbību pogas nav vienādās kolonnās.');
+assert(layoutCss.includes('height:44px'), 'Gatavības poga nav kompakta.');
 assert(layoutCss.includes('#lobbyPanel'), 'Lobija augšējais izkārtojums nav noformēts.');
 
 console.log('✓ Gala servera un klienta kods ir sintaktiski derīgs');
 console.log('✓ Lobija informācija pārvietota augšējā joslā');
+console.log('✓ Augšējie paneļi un darbību pogas ir simetriski');
+console.log('✓ Gatavs spēlei poga ir kompakta');
 console.log('✓ Sānu kolonna padarīta kompaktāka');
 console.log('✓ Socket.IO izmēģina WebSocket un polling rezerves transportu');
 console.log('✓ Savienojuma kļūda atšķir servera un Nginx problēmu');
