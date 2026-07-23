@@ -257,6 +257,9 @@ async function applyUnanimouslyAcceptedMove(roomId,room,vote){
   const exchangeMarker = '    if(!room||!room.started) return;\n    const pid=socket.id;\n    if(!room.players.has(pid)) return;\n    if(currentTurnId(room)!==pid) return;';
   source = replaceOnce(source, exchangeMarker, '    if(!room||!room.started) return;\n    if(room.pendingWordVote) return io.to(socket.id).emit("toast","Vispirms pabeidziet vārda balsošanu.");\n    const pid=socket.id;\n    if(!room.players.has(pid)) return;\n    if(currentTurnId(room)!==pid) return;', 'Neizdevās bloķēt kauliņu maiņu balsošanas laikā.');
 
+  const swapBlankMarker = '  socket.on("swapBlank",({roomId,x,y,rackTileId})=>{\n    const room=rooms.get(roomId);\n    if(!room||!room.started) return;\n    const pid=socket.id;';
+  source = replaceOnce(source, swapBlankMarker, '  socket.on("swapBlank",({roomId,x,y,rackTileId})=>{\n    const room=rooms.get(roomId);\n    if(!room||!room.started) return;\n    if(room.pendingWordVote) return io.to(socket.id).emit("toast","Vispirms pabeidziet vārda balsošanu.");\n    const pid=socket.id;', 'Neizdevās bloķēt tukšā kauliņa maiņu balsošanas laikā.');
+
   const leaveMarker = '    const pid=socket.id;\n    if(!room.players.has(pid)) return;\n\n    const p=room.players.get(pid);';
   source = replaceOnce(source, leaveMarker, '    const pid=socket.id;\n    if(!room.players.has(pid)) return;\n    cancelWordVoteForDeparture(roomId,room,pid);\n\n    const p=room.players.get(pid);', 'Neizdevās atcelt balsošanu, spēlētājam pametot partiju.');
 
