@@ -6,6 +6,7 @@ const { patchAchievementServer, patchAchievementInterface } = require("./achieve
 const { patchWordVoteServer, patchWordVoteInterface } = require("./word-vote-patches");
 const { patchFinalScoringServer, patchFinalScoringInterface } = require("./final-score-patches");
 const { patchLayoutConnectionServer, patchLayoutConnectionInterface } = require("./layout-connection-patches");
+const { patchTouchChatInterface } = require("./interaction-patches");
 
 function materializeBundle(bundlePath, targetPath, transform = (source) => source) {
   const encoded = fs.readFileSync(bundlePath, "utf8").trim();
@@ -53,7 +54,7 @@ materializeBundle(
 materializeBundle(
   path.join(__dirname, "public", "index.bundle.gz.b64"),
   runtimeInterface,
-  (source) => patchLayoutConnectionInterface(patchFinalScoringInterface(patchBoardGridInterface(patchWordVoteInterface(patchAchievementInterface(patchInterface(localizeBoardMultipliers(source)))))))
+  (source) => patchTouchChatInterface(patchLayoutConnectionInterface(patchFinalScoringInterface(patchBoardGridInterface(patchWordVoteInterface(patchAchievementInterface(patchInterface(localizeBoardMultipliers(source))))))))
 );
 
 require(runtimeServer);
