@@ -140,6 +140,30 @@ function findBestBotMove(room, botId, words){
   return best;
 }
 
+function canPotentiallyFormBotWord(room,rack,word){
+  const counts=new Map();
+  let blanks=0;
+  for(const tile of (rack||[])){
+    const ch=String(tile.ch||"").toLowerCase();
+    if(tile.blank||ch==="_"){blanks++;continue;}
+    counts.set(ch,(counts.get(ch)||0)+1);
+  }
+  const boardLetters=new Set();
+  if(!isBoardEmpty(room)) for(let y=0;y<15;y++) for(let x=0;x<15;x++){
+    const ch=String(room.board[y][x]?.ch||"").toLowerCase();
+    if(ch) boardLetters.add(ch);
+  }
+  let missing=0;
+  for(const ch of String(word||"")){
+    const count=counts.get(ch)||0;
+    if(count>0){counts.set(ch,count-1);continue;}
+    if(blanks>0){blanks--;continue;}
+    if(boardLetters.has(ch)&&missing===0){missing++;continue;}
+    return false;
+  }
+  return true;
+}
+
 function generateBotCandidates(room,rack,limit=96){
   const rackLetters=(rack||[]).map(t=>String(t.ch||"").toLowerCase()).filter(ch=>ch&&ch!=="_");
   const blankCount=(rack||[]).filter(t=>t.blank||t.ch==="_").length;
@@ -220,16 +244,20 @@ async function botTakeTurn(roomId){
   try{
     if(!bot.rack||bot.rack.length<7) bot.rack=(bot.rack||[]).concat(drawTiles(room,Math.max(0,7-(bot.rack||[]).length)));
 
-    let best=findBestBotMove(room,botId,BOT_COMMON_WORDS);
+    const commonCandidates=BOT_COMMON_WORDS.filter(word=>canPotentiallyFormBotWord(room,bot.rack,word));
+    const verifiedCommon=await validateBotCandidates(commonCandidates,commonCandidates.length);
+    let current=rooms.get(roomId);
+    if(!current||!current.started||currentTurnId(current)!==botId) return;
+    let best=findBestBotMove(current,botId,verifiedCommon);
     if(!best){
-      const generated=generateBotCandidates(room,bot.rack,96);
+      const generated=generateBotCandidates(current,bot.rack,96);
       const verified=await validateBotCandidates(generated,24);
-      const current=rooms.get(roomId);
+      current=rooms.get(roomId);
       if(!current||!current.started||currentTurnId(current)!==botId) return;
       best=findBestBotMove(current,botId,verified);
     }
 
-    const current=rooms.get(roomId);
+    current=rooms.get(roomId);
     if(!current||!current.started||currentTurnId(current)!==botId) return;
     if(!best) return finishBotWithoutMove(roomId,botId,bot);
 
