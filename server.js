@@ -3,6 +3,7 @@ const path = require("path");
 const zlib = require("zlib");
 const { patchServer, patchInterface } = require("./runtime-patches");
 const { patchAchievementServer, patchAchievementInterface } = require("./achievement-patches");
+const { patchWordVoteServer, patchWordVoteInterface } = require("./word-vote-patches");
 
 function materializeBundle(bundlePath, targetPath, transform = (source) => source) {
   const encoded = fs.readFileSync(bundlePath, "utf8").trim();
@@ -45,12 +46,12 @@ const runtimeInterface = path.join(__dirname, "public", "app.html");
 materializeBundle(
   path.join(__dirname, "server.bundle.gz.b64"),
   runtimeServer,
-  (source) => patchAchievementServer(patchServer(localizeBoardMultipliers(source)))
+  (source) => patchWordVoteServer(patchAchievementServer(patchServer(localizeBoardMultipliers(source))))
 );
 materializeBundle(
   path.join(__dirname, "public", "index.bundle.gz.b64"),
   runtimeInterface,
-  (source) => patchBoardGridInterface(patchAchievementInterface(patchInterface(localizeBoardMultipliers(source))))
+  (source) => patchBoardGridInterface(patchWordVoteInterface(patchAchievementInterface(patchInterface(localizeBoardMultipliers(source)))))
 );
 
 require(runtimeServer);
