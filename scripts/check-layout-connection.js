@@ -7,6 +7,7 @@ const { patchAchievementServer, patchAchievementInterface } = require('../achiev
 const { patchWordVoteServer, patchWordVoteInterface } = require('../word-vote-patches');
 const { patchFinalScoringServer, patchFinalScoringInterface } = require('../final-score-patches');
 const { patchLayoutConnectionServer, patchLayoutConnectionInterface } = require('../layout-connection-patches');
+const { patchTouchChatInterface } = require('../interaction-patches');
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 const root = path.join(__dirname, '..');
@@ -44,12 +45,14 @@ const generatedServer = patchLayoutConnectionServer(
 new vm.Script(generatedServer, { filename: 'generated-runtime-server.js' });
 assert(generatedServer.includes('app.get("/healthz"'), 'Gala serverī nav /healthz pārbaudes maršruta.');
 
-const generatedHtml = patchLayoutConnectionInterface(
-  patchFinalScoringInterface(
-    patchBoardGridInterface(
-      patchWordVoteInterface(
-        patchAchievementInterface(
-          patchInterface(localize(readBundle('public/index.bundle.gz.b64')))
+const generatedHtml = patchTouchChatInterface(
+  patchLayoutConnectionInterface(
+    patchFinalScoringInterface(
+      patchBoardGridInterface(
+        patchWordVoteInterface(
+          patchAchievementInterface(
+            patchInterface(localize(readBundle('public/index.bundle.gz.b64')))
+          )
         )
       )
     )
@@ -59,6 +62,9 @@ assert(generatedHtml.includes("transports:['websocket','polling']"), 'Socket.IO 
 assert(generatedHtml.includes('tryAllTransports:true'), 'Nav Socket.IO transportu rezerves varianta.');
 assert(generatedHtml.includes('/layout-connection.css'), 'Nav jaunā izkārtojuma stilu.');
 assert(generatedHtml.includes('/layout-connection.js'), 'Nav jaunā izkārtojuma skripta.');
+assert(generatedHtml.includes('/touch-chat.css'), 'Nav pieskārienu un čata stilu.');
+assert(generatedHtml.includes('/touch-chat.js'), 'Nav pieskārienu un čata skripta.');
+assert(generatedHtml.includes('tapSelectedTileId=null'), 'Gala klientā nav pieskāriena kauliņa izvēles.');
 assert(generatedHtml.includes('Pārbaudi Burtnieks servisu vai Nginx'), 'Nav saprotama savienojuma kļūdas paziņojuma.');
 
 for (const match of generatedHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
