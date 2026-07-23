@@ -1,0 +1,73 @@
+/* Kompaktāks spēles izkārtojums: lobijs un HUD augšā, darbības sānos. */
+#game.game-grid{
+  grid-template-columns:minmax(0,1fr) minmax(285px,325px);
+  gap:14px;
+}
+#game>.game-top-strip{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(500px,.85fr);
+  gap:12px;
+  min-width:0;
+}
+#game>.game-top-strip>.panel{
+  min-width:0;
+  padding:12px 14px;
+  box-shadow:0 12px 38px rgba(0,0,0,.28);
+}
+#game>.game-top-strip>.game-status-panel .turn-banner{padding:10px 12px}
+#game>.game-top-strip>.game-status-panel .hud{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:8px!important;
+}
+#game>.game-top-strip>.game-status-panel .metric{padding:8px 10px}
+#game>.game-top-strip>.game-status-panel .metric b{font-size:16px}
+#game>.game-top-strip>.game-status-panel #lastMove{margin-top:8px!important}
+#game>.game-top-strip:has(#lobbyPanel.hidden)>.game-status-panel{grid-column:1/-1}
+
+#game>.game-top-strip>#lobbyPanel{
+  display:grid;
+  grid-template-columns:minmax(210px,1fr) minmax(260px,auto) minmax(145px,auto);
+  grid-template-rows:auto auto auto;
+  gap:8px 10px;
+  align-items:end;
+}
+#game>.game-top-strip>#lobbyPanel.hidden{display:none!important}
+#game>.game-top-strip>#lobbyPanel>.section-title{grid-column:1/-1;margin-bottom:0}
+#game>.game-top-strip>#lobbyPanel>.field{grid-column:1;grid-row:2;margin:0}
+#game>.game-top-strip>#lobbyPanel>.row{grid-column:2;grid-row:2;flex-wrap:nowrap}
+#game>.game-top-strip>#lobbyPanel>#readyList{grid-column:1/3;grid-row:3;margin:0!important;align-self:center}
+#game>.game-top-strip>#lobbyPanel>#ready{grid-column:3;grid-row:2/4;width:auto!important;min-width:145px;align-self:stretch}
+
+#game>.board-card{grid-column:1;min-width:0;padding:10px}
+#game>.side{grid-column:2;gap:11px;min-width:0}
+#game>.side>.panel{padding:13px}
+#game>.side .section-title{margin-bottom:8px}
+#game>.side [data-enhanced-word-check] .notice{font-size:11px}
+
+.status-chip.connection-warning{border-color:rgba(255,190,92,.48);background:rgba(105,66,13,.22)}
+.status-chip.connection-error{border-color:rgba(255,107,107,.5);background:rgba(100,23,29,.22)}
+.status-chip.connection-error .dot,.status-chip.connection-warning .dot{background:#ffb45f}
+
+@media(max-width:1220px){
+  #game>.game-top-strip{grid-template-columns:1fr}
+  #game>.game-top-strip>#lobbyPanel{grid-template-columns:minmax(210px,1fr) minmax(260px,1fr) 160px}
+}
+@media(max-width:1050px){
+  #game.game-grid{grid-template-columns:1fr}
+  #game>.game-top-strip,#game>.board-card,#game>.side{grid-column:1}
+  #game>.side{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #game>.side>.panel{grid-column:auto!important}
+  #game>.side>[data-enhanced-word-check]{grid-column:1/-1!important}
+}
+@media(max-width:760px){
+  #game>.game-top-strip>.game-status-panel .hud{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #game>.game-top-strip>#lobbyPanel{display:block}
+  #game>.game-top-strip>#lobbyPanel>.field{margin-bottom:10px}
+  #game>.game-top-strip>#lobbyPanel>.row{margin-bottom:10px}
+  #game>.game-top-strip>#lobbyPanel>#readyList{margin:10px 0!important}
+  #game>.game-top-strip>#lobbyPanel>#ready{width:100%!important;min-height:44px}
+  #game>.side{grid-template-columns:1fr}
+  #game>.side>.panel,#game>.side>[data-enhanced-word-check]{grid-column:1!important}
+}
