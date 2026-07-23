@@ -29,6 +29,16 @@ function localizeBoardMultipliers(source) {
     .replaceAll('.cell[data-m=DL]', '.cell[data-m="2B"]');
 }
 
+function patchBoardGridInterface(source) {
+  if (!source.includes('/board-grid.css')) {
+    source = source.replace('</head>', '<link rel="stylesheet" href="/board-grid.css">\n</head>');
+  }
+  if (!source.includes('/board-grid.js')) {
+    source = source.replace('</body>', '<script src="/board-grid.js"></script>\n</body>');
+  }
+  return source;
+}
+
 const runtimeServer = path.join(__dirname, ".runtime-server.js");
 const runtimeInterface = path.join(__dirname, "public", "app.html");
 
@@ -40,7 +50,7 @@ materializeBundle(
 materializeBundle(
   path.join(__dirname, "public", "index.bundle.gz.b64"),
   runtimeInterface,
-  (source) => patchAchievementInterface(patchInterface(localizeBoardMultipliers(source)))
+  (source) => patchBoardGridInterface(patchAchievementInterface(patchInterface(localizeBoardMultipliers(source))))
 );
 
 require(runtimeServer);
