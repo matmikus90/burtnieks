@@ -1,0 +1,65 @@
+/* Pieskārienu vadība kauliņiem un čata izvietošana. */
+.tile.tap-selected{
+  outline:4px solid #62e9a0;
+  outline-offset:2px;
+  transform:translateY(-7px) scale(1.045);
+  box-shadow:0 10px 24px rgba(0,0,0,.58),0 0 0 5px rgba(98,233,160,.18);
+  z-index:4;
+}
+.cell.tap-target{
+  cursor:pointer;
+  box-shadow:inset 0 0 0 2px rgba(98,233,160,.72),0 0 0 1px rgba(98,233,160,.2);
+}
+.cell.tap-target::after{
+  content:'+';
+  position:absolute;
+  display:grid;
+  place-items:center;
+  width:42%;
+  aspect-ratio:1;
+  border:1px dashed rgba(221,255,235,.78);
+  border-radius:50%;
+  color:rgba(221,255,235,.88);
+  font-size:clamp(12px,1.5vw,22px);
+  font-weight:900;
+  pointer-events:none;
+}
+.chat-head{gap:8px}
+.chat-head b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-head .chat-head-actions{display:flex;gap:6px;margin-left:auto;flex:0 0 auto}
+.chat-drag-reset{padding:5px 9px!important;min-width:34px;cursor:pointer}
+.chat.chat-floating .chat-head{cursor:grab;touch-action:none;user-select:none}
+.chat.chat-floating.dragging .chat-head{cursor:grabbing}
+.chat.chat-floating.dragging{transition:none!important;box-shadow:0 22px 60px rgba(0,0,0,.6)}
+.chat.chat-inline{
+  position:static!important;
+  inset:auto!important;
+  width:100%!important;
+  max-width:none!important;
+  transform:none!important;
+  grid-column:1/-1!important;
+  z-index:auto;
+  margin:0;
+}
+.chat.chat-inline .chat-head{cursor:default;border-radius:16px 16px 0 0}
+.chat.chat-inline.min .chat-head{border-radius:16px}
+.chat.chat-inline .chat-body{max-height:220px}
+.chat.chat-inline.hidden{display:none!important}
+.tap-tile-hint{margin:-2px 0 9px;font-size:11px;line-height:1.35}
+@media(pointer:coarse){
+  .rack .tile{cursor:pointer}
+  .tile.tap-selected{transform:translateY(-5px) scale(1.035)}
+  .cell.tap-target::after{width:48%}
+}
+@media(max-width:1050px){
+  #game>.side>.chat.chat-inline{grid-column:1/-1!important}
+  .chat-drag-reset{display:none!important}
+}
+@media(max-width:720px){
+  .chat.chat-inline .chat-body{max-height:180px}
+  .chat.chat-inline .chat-input{position:sticky;bottom:0}
+}
+@media(prefers-reduced-motion:no-preference){
+  .tile.tap-selected{transition:transform .14s ease,outline-color .14s ease,box-shadow .14s ease}
+  .cell.tap-target{transition:box-shadow .14s ease}
+}

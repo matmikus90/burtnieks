@@ -1,0 +1,142 @@
+/* Kompaktāks spēles izkārtojums: lobijs un HUD augšā, darbības sānos. */
+#game.game-grid{
+  grid-template-columns:minmax(0,1fr) minmax(285px,325px);
+  gap:14px;
+}
+#game>.game-top-strip{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  min-width:0;
+  align-items:stretch;
+}
+#game>.game-top-strip>.panel{
+  min-width:0;
+  height:100%;
+  padding:12px 14px;
+  box-shadow:0 12px 38px rgba(0,0,0,.28);
+}
+#game>.game-top-strip>.game-status-panel .turn-banner{
+  min-height:40px;
+  display:grid;
+  place-items:center;
+  padding:9px 12px;
+}
+#game>.game-top-strip>.game-status-panel .hud{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:8px!important;
+}
+#game>.game-top-strip>.game-status-panel .metric{
+  min-height:58px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:8px 10px;
+}
+#game>.game-top-strip>.game-status-panel .metric b{font-size:16px}
+#game>.game-top-strip>.game-status-panel #lastMove{margin-top:8px!important}
+#game>.game-top-strip:has(#lobbyPanel.hidden)>.game-status-panel{grid-column:1/-1}
+
+#game>.game-top-strip>#lobbyPanel{
+  display:grid;
+  grid-template-columns:minmax(245px,1fr) minmax(360px,1.35fr);
+  grid-template-rows:auto auto auto;
+  gap:8px 12px;
+  align-content:start;
+  align-items:end;
+}
+#game>.game-top-strip>#lobbyPanel.hidden{display:none!important}
+#game>.game-top-strip>#lobbyPanel>.section-title{
+  grid-column:1/-1;
+  min-height:40px;
+  display:grid;
+  place-items:center;
+  margin:0;
+  padding:9px 12px;
+  border:1px solid rgba(88,228,145,.4);
+  border-radius:12px;
+  background:rgba(37,122,77,.38);
+  color:var(--text);
+  font-size:13px;
+  letter-spacing:.04em;
+  text-transform:none;
+}
+#game>.game-top-strip>#lobbyPanel>.field{
+  grid-column:1;
+  grid-row:2;
+  margin:0;
+}
+#game>.game-top-strip>#lobbyPanel>.field label{
+  min-height:28px;
+  display:flex;
+  align-items:flex-end;
+  line-height:1.25;
+}
+#game>.game-top-strip>#lobbyPanel>.field input{
+  min-height:44px;
+}
+#game>.game-top-strip>#lobbyPanel>.row{
+  grid-column:2;
+  grid-row:2;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin:0;
+  align-items:end;
+}
+#game>.game-top-strip>#lobbyPanel>.row>.btn,
+#game>.game-top-strip>#lobbyPanel>.row>#ready{
+  width:100%!important;
+  min-width:0;
+  min-height:44px;
+  height:44px;
+  padding:0 10px;
+  border-radius:12px;
+  line-height:1.15;
+  white-space:normal;
+}
+#game>.game-top-strip>#lobbyPanel>#readyList{
+  grid-column:1/-1;
+  grid-row:3;
+  min-height:26px;
+  display:flex;
+  align-items:center;
+  margin:0!important;
+  padding-top:2px;
+}
+
+#game>.board-card{grid-column:1;min-width:0;padding:10px}
+#game>.side{grid-column:2;gap:11px;min-width:0}
+#game>.side>.panel{padding:13px}
+#game>.side .section-title{margin-bottom:8px}
+#game>.side [data-enhanced-word-check] .notice{font-size:11px}
+
+.status-chip.connection-warning{border-color:rgba(255,190,92,.48);background:rgba(105,66,13,.22)}
+.status-chip.connection-error{border-color:rgba(255,107,107,.5);background:rgba(100,23,29,.22)}
+.status-chip.connection-error .dot,.status-chip.connection-warning .dot{background:#ffb45f}
+
+@media(max-width:1220px){
+  #game>.game-top-strip{grid-template-columns:1fr}
+  #game>.game-top-strip>#lobbyPanel{grid-template-columns:minmax(230px,.8fr) minmax(420px,1.2fr)}
+}
+@media(max-width:1050px){
+  #game.game-grid{grid-template-columns:1fr}
+  #game>.game-top-strip,#game>.board-card,#game>.side{grid-column:1}
+  #game>.side{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #game>.side>.panel{grid-column:auto!important}
+  #game>.side>[data-enhanced-word-check]{grid-column:1/-1!important}
+}
+@media(max-width:760px){
+  #game>.game-top-strip>.game-status-panel .hud{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #game>.game-top-strip>#lobbyPanel{grid-template-columns:1fr;display:grid}
+  #game>.game-top-strip>#lobbyPanel>.section-title,
+  #game>.game-top-strip>#lobbyPanel>.field,
+  #game>.game-top-strip>#lobbyPanel>.row,
+  #game>.game-top-strip>#lobbyPanel>#readyList{grid-column:1;grid-row:auto}
+  #game>.game-top-strip>#lobbyPanel>.row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #game>.game-top-strip>#lobbyPanel>.row>#ready{grid-column:1/-1}
+  #game>.side{grid-template-columns:1fr}
+  #game>.side>.panel,#game>.side>[data-enhanced-word-check]{grid-column:1!important}
+}
